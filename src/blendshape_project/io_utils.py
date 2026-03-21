@@ -5,6 +5,8 @@ import json
 import math
 import random
 import re
+import wave
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +15,16 @@ import pandas as pd
 import torch
 
 from .constants import DEFAULT_FPS, PHONEME_SIL
+
+
+@dataclass(frozen=True)
+class AudioMetadata:
+    sample_rate: int
+    num_frames: int
+
+    @property
+    def duration_sec(self) -> float:
+        return self.num_frames / max(self.sample_rate, 1)
 
 
 def ensure_dir(path: Path) -> Path:
@@ -58,6 +70,15 @@ def read_blendshape_csv(path: Path) -> np.ndarray:
     if values.ndim == 1:
         values = values[None, :]
     return values
+
+
+def read_wav_metadata(path: str | Path) -> AudioMetadata:
+    wav_path = Path(path)
+    with wave.open(str(wav_path), "rb") as handle:
+        return AudioMetadata(
+            sample_rate=handle.getframerate(),
+            num_frames=handle.getnframes(),
+        )
 
 
 def write_blendshape_csv(path: Path, values: np.ndarray) -> None:
@@ -112,4 +133,3 @@ def round_duration_to_frames(duration_sec: float, fps: int = DEFAULT_FPS) -> int
 
 def sorted_numeric_paths(paths: list[Path]) -> list[Path]:
     return sorted(paths, key=lambda item: sample_number_from_name(item))
-

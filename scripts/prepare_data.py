@@ -8,7 +8,6 @@ import zipfile
 from pathlib import Path
 
 import pandas as pd
-import torchaudio
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -29,6 +28,7 @@ from blendshape_project.constants import (  # noqa: E402
 from blendshape_project.io_utils import (  # noqa: E402
     ensure_dir,
     read_alignment,
+    read_wav_metadata,
     read_blendshape_csv,
     read_transcripts_xlsx,
     sample_number_from_name,
@@ -101,7 +101,7 @@ def build_manifests(seed: int, val_fraction: float) -> dict[str, int]:
             number = sample_number_from_name(csv_path)
             wav_path = csv_path.with_suffix(".wav")
             target = read_blendshape_csv(csv_path)
-            audio_info = torchaudio.info(str(wav_path))
+            audio_info = read_wav_metadata(wav_path)
             sample_id = f"{speaker}_{number:03d}"
             natural_records.append(
                 {
@@ -113,7 +113,7 @@ def build_manifests(seed: int, val_fraction: float) -> dict[str, int]:
                     "phoneme_path": str((phoneme_dir / f"{sample_id}.txt").resolve()),
                     "word_alignment_path": str((word_dir / f"{sample_id}.txt").resolve()),
                     "text": transcripts.get(number, ""),
-                    "duration_sec": audio_info.num_frames / audio_info.sample_rate,
+                    "duration_sec": audio_info.duration_sec,
                     "n_frames": int(target.shape[0]),
                     "fps": DEFAULT_FPS,
                     "split_type": "natural",
@@ -129,7 +129,7 @@ def build_manifests(seed: int, val_fraction: float) -> dict[str, int]:
         for wav_path in synth_paths:
             raw_number = sample_number_from_name(wav_path)
             mapped_number = raw_number + transcript_offset
-            audio_info = torchaudio.info(str(wav_path))
+            audio_info = read_wav_metadata(wav_path)
             synth_records.append(
                 {
                     "sample_id": wav_path.stem,
@@ -141,8 +141,8 @@ def build_manifests(seed: int, val_fraction: float) -> dict[str, int]:
                     "phoneme_path": "",
                     "word_alignment_path": "",
                     "text": transcripts.get(mapped_number, ""),
-                    "duration_sec": audio_info.num_frames / audio_info.sample_rate,
-                    "n_frames": int(round(audio_info.num_frames / audio_info.sample_rate * DEFAULT_FPS)),
+                    "duration_sec": audio_info.duration_sec,
+                    "n_frames": int(round(audio_info.duration_sec * DEFAULT_FPS)),
                     "fps": DEFAULT_FPS,
                     "split_type": "synth",
                 }
@@ -207,4 +207,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
