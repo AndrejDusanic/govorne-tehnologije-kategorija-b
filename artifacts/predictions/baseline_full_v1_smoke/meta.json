@@ -1,0 +1,18 @@
+{
+  "system": {
+    "lookahead_ms": 0,
+    "fps_out": 60
+  },
+  "files": {
+    "spk08_0005.wav": {
+      "csv_path": "spk08_0005.csv",
+      "inference_time_sec": 0.5838704000002508,
+      "rtf": 0.16084483546145187
+    },
+    "spk14_0000.wav": {
+      "csv_path": "spk14_0000.csv",
+      "inference_time_sec": 0.03856980000000476,
+      "rtf": 0.003151115775511425
+    }
+  }
+}

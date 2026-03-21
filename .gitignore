@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+data/cache/
+data/extracted/
+data/extracted/avatar/
+artifacts/tmp/

@@ -1,0 +1,11 @@
+{
+  "n_natural": 358,
+  "n_synth": 353,
+  "n_train": 304,
+  "n_val": 54,
+  "blendshape_count": 52,
+  "phoneme_count": 34,
+  "fps": 60,
+  "seed": 1337,
+  "val_fraction": 0.15
+}
