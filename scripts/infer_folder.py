@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+import math
 from pathlib import Path
 
 import numpy as np
@@ -64,13 +65,14 @@ def main() -> None:
     wav_paths = sorted(args.input_dir.glob("*.wav"))
     meta = {
         "system": {
-            "lookahead_ms": -1 if any(bundle.config.get("temporal_encoder", "causal_tcn") == "bgru" for bundle in bundles) else 0,
+            "lookahead_ms": 0,
             "fps_out": args.fps,
             "ensemble_size": len(bundles),
             "checkpoints": [f"{bundle.checkpoint_path.parent.name}/{bundle.checkpoint_path.name}" for bundle in bundles],
         },
         "files": {},
     }
+    max_duration_sec = 0.0
 
     with torch.no_grad():
         for wav_path in wav_paths:
@@ -104,12 +106,16 @@ def main() -> None:
             write_blendshape_csv(output_csv, prediction)
 
             duration_sec = waveform.shape[-1] / feature_extractor.sample_rate
+            max_duration_sec = max(max_duration_sec, duration_sec)
             meta["files"][wav_path.name] = {
                 "csv_path": output_csv.name,
                 "text_used": text,
                 "inference_time_sec": elapsed,
                 "rtf": elapsed / max(duration_sec, 1e-6),
             }
+
+    if any(bundle.config.get("temporal_encoder", "causal_tcn") == "bgru" for bundle in bundles):
+        meta["system"]["lookahead_ms"] = int(math.ceil(max_duration_sec * 1000.0))
 
     save_json(args.output_dir / "meta.json", meta)
     print(f"Inference completed for {len(wav_paths)} files.")
