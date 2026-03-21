@@ -7,29 +7,42 @@ Trenutno je implementiran i provjeren kompletan audio-driven pipeline:
 - raspakivanje i organizacija podataka
 - gradnja manifesta i fiksnog `train/val` splita
 - EDA grafikoni nad bazom
-- causal audio model sa speaker embedding-om
+- hibridni audio+text model sa speaker embedding-om
+- bidirectional temporal encoder za kvalitetniji offline mod
 - multitask trening sa pomocnim fonemskim loss-om
+- activity/peak weighted loss za teze usne blendshape-ove
 - evaluacija sa grafikonima
 - inferenca koja generise `CSV` i `meta.json`
 - Colab notebook za pokretanje svega iz Git repozitorija
 
 ## Trenutni najbolji rezultat
 
-Run: `artifacts/checkpoints/baseline_full_v1`
+Najbolji setup koji je trenutno spreman u repou je ensemble ova dva checkpointa:
 
-- Validation MAE: `0.0189505`
-- Validation RMSE: `0.0451437`
-- Mouth-only MAE: `0.0230344`
-- JawOpen MAE: `0.0258554`
+- `artifacts/checkpoints/baseline_full_v1/best.pt`
+- `artifacts/checkpoints/hybrid_bgru_v1/best.pt`
+
+Ensemble rezultat na validation splitu:
+
+- Validation MAE: `0.0185569`
+- Validation RMSE: `0.0432647`
+- Mouth-only MAE: `0.0224074`
+- JawOpen MAE: `0.0244156`
+
+Najbolji pojedinacni checkpoint po MAE i dalje je `baseline_full_v1`, dok `hybrid_bgru_v1` sluzi kao drugi clan ensemble-a i popravlja ukupan skor kada se prosjece raw predikcije.
 
 Najvazniji grafici su vec generisani:
 
 - `reports/figures/dataset_overview.png`
 - `reports/figures/blendshape_activity.png`
 - `reports/figures/phoneme_distribution.png`
+- `reports/figures/ensemble_default/validation_per_blendshape_mae.png`
+- `reports/figures/ensemble_default/ensemble_spk08_001_overlay.png`
 - `artifacts/checkpoints/baseline_full_v1/training_curves.png`
 - `artifacts/checkpoints/baseline_full_v1/val_per_blendshape_mae.png`
 - `artifacts/checkpoints/baseline_full_v1/spk08_001_overlay.png`
+- `artifacts/checkpoints/hybrid_bgru_v1/training_curves.png`
+- `artifacts/checkpoints/hybrid_bgru_v1/val_per_blendshape_mae.png`
 
 ## Struktura
 
@@ -42,13 +55,15 @@ Najvazniji grafici su vec generisani:
 - `scripts/train.py`
   - trenira model i cuva checkpoint + grafike
 - `scripts/evaluate.py`
-  - evaluacija nad validation splitom
+  - evaluacija nad validation splitom za jedan checkpoint ili ensemble
 - `scripts/infer_folder.py`
-  - inferenca nad folderom sa `.wav` fajlovima
+  - inferenca nad folderom sa `.wav` fajlovima za jedan checkpoint ili ensemble
 - `notebooks/competition_pipeline_colab.ipynb`
   - Colab workflow
 - `artifacts/checkpoints/baseline_full_v1/`
-  - najbolji istrenirani model i metrike
+  - najbolji pojedinacni checkpoint
+- `artifacts/checkpoints/hybrid_bgru_v1/`
+  - hibridni `bgru` checkpoint za ensemble
 
 ## Brzi start lokalno
 
@@ -65,22 +80,40 @@ python scripts/prepare_data.py
 python scripts/analyze_data.py
 ```
 
-3. Trening:
+3. Najbrza provjera najboljeg spremnog setupa:
 
 ```powershell
-python scripts/train.py --run-name baseline_full_v1 --epochs 18 --batch-size 8 --device cuda
+python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/hybrid_bgru_v1/best.pt --device cuda
 ```
 
-4. Evaluacija:
+4. Trening novog jaceg offline modela:
+
+```powershell
+python scripts/train.py --run-name improved_full_run --epochs 18 --batch-size 8 --device cuda --temporal-encoder bgru
+```
+
+Ako hoces samo da provjeris da setup radi bez novog treninga, evaluiraj vec prilozeni checkpoint:
 
 ```powershell
 python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt --device cuda
 ```
 
-5. Inferenca nad novim audio fajlovima:
+5. Evaluacija svog novog runa:
 
 ```powershell
-python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda
+python scripts/evaluate.py --checkpoint artifacts/checkpoints/improved_full_run/best.pt --device cuda
+```
+
+6. Inferenca nad novim audio fajlovima sa najboljim spremnim ensemble-om:
+
+```powershell
+python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/hybrid_bgru_v1/best.pt --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda
+```
+
+7. Inferenca nad novim audio fajlovima sa svojim novim runom:
+
+```powershell
+python scripts/infer_folder.py --checkpoint artifacts/checkpoints/improved_full_run/best.pt --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda
 ```
 
 ## Colab workflow
@@ -117,7 +150,8 @@ U repou treba da ostanu:
 - `.gitignore`
 - `.gitattributes`
 - originalni ZIP fajlovi i PDF
-- `artifacts/checkpoints/baseline_full_v1/` ako zelis odmah imati gotov model u Colabu
+- `artifacts/checkpoints/baseline_full_v1/`
+- `artifacts/checkpoints/hybrid_bgru_v1/`
 
 U repou ne treba da budu:
 
@@ -174,29 +208,59 @@ Ako hoces rucno:
 Ako hoces samo evaluaciju vec istreniranog modela:
 
 ```bash
-!python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt --device cuda
+!python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/hybrid_bgru_v1/best.pt --device cuda
 ```
 
 Ako hoces trening u Colabu:
 
 ```bash
-!python scripts/train.py --run-name colab_full_run --epochs 18 --batch-size 8 --device cuda
+!python scripts/train.py --run-name improved_full_run --epochs 18 --batch-size 8 --device cuda --temporal-encoder bgru
 ```
 
 Ako hoces inferencu nad test WAV folderom:
 
 ```bash
-!python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt --input-dir test_wavs --output-dir artifacts/predictions/colab_test --device cuda
+!python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/hybrid_bgru_v1/best.pt --input-dir test_wavs --output-dir artifacts/predictions/colab_test --device cuda
 ```
 
 ## Model u jednoj recenici
 
-Model koristi log-mel + delta + delta-delta audio feature-e na `60 FPS`, speaker conditioning i causal dilated temporal blokove, uz dodatni fonemski supervision iz `labels_aligned` skupa.
+Novi default model koristi log-mel + delta + delta-delta audio feature-e na `60 FPS`, speaker conditioning, text conditioning preko karakter-level attention grane i bidirectional GRU temporal encoder, uz dodatni fonemski supervision i peak-aware loss za usne koeficijente.
+
+`scripts/evaluate.py` i `scripts/infer_folder.py` sada podrzavaju vise `--checkpoint` argumenata i rade raw-space averaging, pa dobijes ensemble bez dodatnog koda.
 
 ## Ideje za jos bolji plasman
 
 - pseudo-labeling nad `audio_synth`
 - dodatni smoothing/post-processing po blendshape grupama
-- poseban loss za lipsync koeficijente sa vecim tezinama
 - dva moda: `offline best-quality` i `strict causal low-latency`
 - k-fold validacija prije finalnog treninga
+
+## Novi trening komande
+
+Za novi kvalitetniji offline model:
+
+```powershell
+python scripts/train.py --run-name improved_full_run --epochs 18 --batch-size 8 --device cuda --temporal-encoder bgru
+```
+
+Ako zelis stari strogo kauzalni mod:
+
+```powershell
+python scripts/train.py --run-name causal_run --epochs 18 --batch-size 8 --device cuda --temporal-encoder causal_tcn --no-text-conditioning
+```
+
+## Inferenca sa tekstom
+
+Ako uz audio imas i tekst po fajlu, napravi folder sa `.txt` fajlovima istog naziva kao `.wav`.
+
+Primjer:
+
+- `test_wavs/spk08_test.wav`
+- `test_texts/spk08_test.txt`
+
+Komanda:
+
+```powershell
+python scripts/infer_folder.py --checkpoint artifacts/checkpoints/improved_full_run/best.pt --input-dir test_wavs --text-dir test_texts --output-dir artifacts/predictions/test_run --device cuda
+```

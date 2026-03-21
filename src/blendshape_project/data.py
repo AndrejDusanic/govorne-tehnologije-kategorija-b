@@ -3,12 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+import warnings
 
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
 import torchaudio
+from scipy.io import wavfile
+from scipy.io.wavfile import WavFileWarning
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 from tqdm import tqdm
@@ -21,6 +24,8 @@ from .constants import (
     PHONEME_PAD,
     PHONEME_UNK,
     SPEAKER_ORDER,
+    TEXT_PAD,
+    TEXT_UNK,
 )
 from .io_utils import framewise_phoneme_labels, read_alignment, read_blendshape_csv
 
@@ -108,10 +113,51 @@ class AudioFeatureExtractor:
 
 
 def load_waveform(audio_path: str | Path, target_sr: int = DEFAULT_SAMPLE_RATE) -> torch.Tensor:
-    waveform, sample_rate = torchaudio.load(str(audio_path))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", WavFileWarning)
+        sample_rate, waveform_np = wavfile.read(str(audio_path))
+    if waveform_np.dtype == np.uint8:
+        waveform_np = (waveform_np.astype(np.float32) - 128.0) / 128.0
+    elif np.issubdtype(waveform_np.dtype, np.integer):
+        scale = float(max(abs(np.iinfo(waveform_np.dtype).min), np.iinfo(waveform_np.dtype).max))
+        waveform_np = waveform_np.astype(np.float32) / max(scale, 1.0)
+    else:
+        waveform_np = waveform_np.astype(np.float32)
+
+    if waveform_np.ndim == 1:
+        waveform = torch.from_numpy(waveform_np).unsqueeze(0)
+    else:
+        waveform = torch.from_numpy(waveform_np.T.copy())
+
     if sample_rate != target_sr:
         waveform = torchaudio.functional.resample(waveform, sample_rate, target_sr)
     return waveform
+
+
+def normalize_text(text: str) -> str:
+    if text is None:
+        value = ""
+    elif isinstance(text, float) and np.isnan(text):
+        value = ""
+    else:
+        value = str(text)
+    return " ".join(value.strip().lower().split())
+
+
+def build_char_vocab(texts: list[str]) -> dict[str, int]:
+    symbols = {TEXT_PAD, TEXT_UNK}
+    for text in texts:
+        normalized = normalize_text(text)
+        symbols.update(normalized)
+    ordered = [TEXT_PAD, TEXT_UNK] + sorted(symbols - {TEXT_PAD, TEXT_UNK})
+    return {symbol: index for index, symbol in enumerate(ordered)}
+
+
+def text_to_char_ids(text: str, vocab: dict[str, int]) -> torch.Tensor:
+    normalized = normalize_text(text)
+    if not normalized:
+        return torch.tensor([vocab.get(TEXT_UNK, 1)], dtype=torch.long)
+    return torch.tensor([vocab.get(char, vocab.get(TEXT_UNK, 1)) for char in normalized], dtype=torch.long)
 
 
 def compute_dataset_stats(
@@ -162,12 +208,14 @@ class BlendshapeDataset(Dataset):
         feature_extractor: AudioFeatureExtractor,
         stats: DatasetStats | None = None,
         phoneme_vocab: dict[str, int] | None = None,
+        char_vocab: dict[str, int] | None = None,
         speaker_to_id: dict[str, int] | None = None,
     ) -> None:
         self.frame = frame.reset_index(drop=True)
         self.feature_extractor = feature_extractor
         self.stats = stats
         self.phoneme_vocab = phoneme_vocab or {PHONEME_PAD: 0, PHONEME_UNK: 1}
+        self.char_vocab = char_vocab or {TEXT_PAD: 0, TEXT_UNK: 1}
         self.speaker_to_id = speaker_to_id or {speaker: idx for idx, speaker in enumerate(SPEAKER_ORDER)}
         self.feature_mean = None
         self.feature_std = None
@@ -185,10 +233,14 @@ class BlendshapeDataset(Dataset):
     def __getitem__(self, index: int) -> dict[str, Any]:
         record = self.frame.iloc[index].to_dict()
         waveform = load_waveform(record["audio_path"], self.feature_extractor.sample_rate)
+        text = record.get("text", "")
+        text_ids = text_to_char_ids(text, self.char_vocab)
 
         target_tensor: torch.Tensor | None = None
+        target_activity = None
         if pd.notna(record.get("blendshape_path", None)) and str(record.get("blendshape_path", "")).strip():
             target_tensor = torch.from_numpy(read_blendshape_csv(Path(record["blendshape_path"]))).float()
+            target_activity = target_tensor.clamp_min(0.0)
             target_frames = target_tensor.shape[0]
         else:
             target_frames = max(1, int(round(float(record["duration_sec"]) * self.feature_extractor.fps)))
@@ -218,9 +270,11 @@ class BlendshapeDataset(Dataset):
             "sample_id": record["sample_id"],
             "speaker": record["speaker"],
             "speaker_id": self.speaker_to_id[record["speaker"]],
-            "text": record.get("text", ""),
+            "text": text,
+            "text_ids": text_ids,
             "features": features,
             "targets": target_tensor,
+            "target_activity": target_activity,
             "phoneme_ids": phoneme_ids,
             "length": features.shape[0],
             "duration_sec": float(record["duration_sec"]),
@@ -232,8 +286,11 @@ def collate_batch(batch: list[dict[str, Any]]) -> dict[str, Any]:
     lengths = torch.tensor([item["length"] for item in batch], dtype=torch.long)
     features = pad_sequence([item["features"] for item in batch], batch_first=True)
     max_length = features.shape[1]
+    text_ids = pad_sequence([item["text_ids"] for item in batch], batch_first=True, padding_value=0)
+    text_lengths = torch.tensor([item["text_ids"].shape[0] for item in batch], dtype=torch.long)
 
     targets = torch.zeros(features.shape[0], max_length, N_BLENDSHAPES, dtype=torch.float32)
+    target_activity = torch.zeros(features.shape[0], max_length, N_BLENDSHAPES, dtype=torch.float32)
     target_mask = torch.zeros(features.shape[0], max_length, dtype=torch.bool)
     phoneme_ids = torch.full((features.shape[0], max_length), fill_value=-100, dtype=torch.long)
 
@@ -242,6 +299,7 @@ def collate_batch(batch: list[dict[str, Any]]) -> dict[str, Any]:
         phoneme_ids[batch_index, :length] = item["phoneme_ids"]
         if item["targets"] is not None:
             targets[batch_index, :length] = item["targets"]
+            target_activity[batch_index, :length] = item["target_activity"]
             target_mask[batch_index, :length] = True
 
     return {
@@ -249,8 +307,11 @@ def collate_batch(batch: list[dict[str, Any]]) -> dict[str, Any]:
         "speakers": [item["speaker"] for item in batch],
         "speaker_ids": torch.tensor([item["speaker_id"] for item in batch], dtype=torch.long),
         "texts": [item["text"] for item in batch],
+        "text_ids": text_ids,
+        "text_lengths": text_lengths,
         "features": features,
         "targets": targets,
+        "target_activity": target_activity,
         "target_mask": target_mask,
         "phoneme_ids": phoneme_ids,
         "lengths": lengths,
@@ -263,4 +324,3 @@ def unnormalize_targets(values: torch.Tensor, stats: DatasetStats) -> torch.Tens
     mean = torch.tensor(stats.target_mean, dtype=values.dtype, device=values.device)
     std = torch.tensor(stats.target_std, dtype=values.dtype, device=values.device)
     return values * std + mean
-

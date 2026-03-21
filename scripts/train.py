@@ -20,6 +20,7 @@ from blendshape_project.data import (  # noqa: E402
     AudioFeatureExtractor,
     BlendshapeDataset,
     DatasetStats,
+    build_char_vocab,
     collate_batch,
     compute_dataset_stats,
 )
@@ -57,6 +58,16 @@ def main() -> None:
     parser.add_argument("--dropout", type=float, default=0.12)
     parser.add_argument("--phoneme-loss-weight", type=float, default=0.2)
     parser.add_argument("--temporal-loss-weight", type=float, default=0.1)
+    parser.add_argument("--activity-loss-weight", type=float, default=2.5)
+    parser.add_argument("--peak-loss-weight", type=float, default=0.35)
+    parser.add_argument("--activity-gamma", type=float, default=1.5)
+    parser.add_argument("--temporal-encoder", type=str, default="bgru", choices=["causal_tcn", "bgru"])
+    parser.add_argument("--use-text-conditioning", action="store_true", default=True)
+    parser.add_argument("--no-text-conditioning", dest="use_text_conditioning", action="store_false")
+    parser.add_argument("--char-embed-dim", type=int, default=64)
+    parser.add_argument("--text-hidden-size", type=int, default=128)
+    parser.add_argument("--num-attention-heads", type=int, default=4)
+    parser.add_argument("--num-gru-layers", type=int, default=2)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--seed", type=int, default=1337)
@@ -82,9 +93,25 @@ def main() -> None:
     feature_extractor = AudioFeatureExtractor()
     stats = compute_dataset_stats(train_df.to_dict("records"), feature_extractor)
     save_json(run_dir / "stats.json", stats.to_json())
+    char_vocab = build_char_vocab(frame["text"].fillna("").astype(str).tolist())
+    save_json(run_dir / "char_vocab.json", char_vocab)
 
-    train_dataset = BlendshapeDataset(train_df, feature_extractor, stats=stats, phoneme_vocab=phoneme_vocab, speaker_to_id=speaker_to_id)
-    val_dataset = BlendshapeDataset(val_df, feature_extractor, stats=stats, phoneme_vocab=phoneme_vocab, speaker_to_id=speaker_to_id)
+    train_dataset = BlendshapeDataset(
+        train_df,
+        feature_extractor,
+        stats=stats,
+        phoneme_vocab=phoneme_vocab,
+        char_vocab=char_vocab,
+        speaker_to_id=speaker_to_id,
+    )
+    val_dataset = BlendshapeDataset(
+        val_df,
+        feature_extractor,
+        stats=stats,
+        phoneme_vocab=phoneme_vocab,
+        char_vocab=char_vocab,
+        speaker_to_id=speaker_to_id,
+    )
 
     train_loader = DataLoader(
         train_dataset,
@@ -108,8 +135,15 @@ def main() -> None:
         num_blendshapes=len(BLENDSHAPE_NAMES),
         num_speakers=len(speaker_to_id),
         num_phonemes=len(phoneme_vocab),
+        num_chars=len(char_vocab),
         hidden_size=args.hidden_size,
         dropout=args.dropout,
+        char_embed_dim=args.char_embed_dim,
+        text_hidden_size=args.text_hidden_size,
+        use_text_conditioning=args.use_text_conditioning,
+        temporal_encoder=args.temporal_encoder,
+        num_attention_heads=args.num_attention_heads,
+        num_gru_layers=args.num_gru_layers,
     ).to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
@@ -129,17 +163,35 @@ def main() -> None:
         for batch in progress:
             features = batch["features"].to(device)
             speaker_ids = batch["speaker_ids"].to(device)
+            lengths = batch["lengths"].to(device)
+            text_ids = batch["text_ids"].to(device)
+            text_lengths = batch["text_lengths"].to(device)
             targets = batch["targets"].to(device)
             target_mask = batch["target_mask"].to(device)
+            target_activity = batch["target_activity"].to(device)
             phoneme_ids = batch["phoneme_ids"].to(device)
 
             optimizer.zero_grad(set_to_none=True)
-            outputs = model(features, speaker_ids)
+            outputs = model(
+                features,
+                speaker_ids,
+                lengths=lengths,
+                text_ids=text_ids,
+                text_lengths=text_lengths,
+            )
             losses = compute_losses(
                 outputs,
-                {"targets": targets, "target_mask": target_mask, "phoneme_ids": phoneme_ids},
+                {
+                    "targets": targets,
+                    "target_mask": target_mask,
+                    "target_activity": target_activity,
+                    "phoneme_ids": phoneme_ids,
+                },
                 phoneme_loss_weight=args.phoneme_loss_weight,
                 temporal_loss_weight=args.temporal_loss_weight,
+                activity_loss_weight=args.activity_loss_weight,
+                peak_loss_weight=args.peak_loss_weight,
+                activity_gamma=args.activity_gamma,
                 coefficient_weights=coefficient_weights,
             )
             losses["loss"].backward()
@@ -169,6 +221,7 @@ def main() -> None:
             "stats": stats.to_json(),
             "speaker_to_id": speaker_to_id,
             "phoneme_vocab": phoneme_vocab,
+            "char_vocab": char_vocab,
             "blendshape_names": BLENDSHAPE_NAMES,
         }
         torch.save(checkpoint, run_dir / "last.pt")

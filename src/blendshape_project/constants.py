@@ -76,6 +76,8 @@ DEFAULT_VAL_FRACTION = 0.15
 PHONEME_PAD = "<pad>"
 PHONEME_UNK = "<unk>"
 PHONEME_SIL = "SIL"
+TEXT_PAD = "<pad>"
+TEXT_UNK = "<unk>"
 
 
 def repo_root() -> Path:
@@ -93,3 +95,20 @@ def blendshape_priority_weights() -> list[float]:
             weights.append(1.0)
     return weights
 
+
+def blendshape_focus_indices() -> list[int]:
+    focus = {
+        "jawOpen",
+        "mouthFunnel",
+        "mouthPucker",
+        "mouthClose",
+        "mouthUpperUpLeft",
+        "mouthUpperUpRight",
+        "mouthLowerDownLeft",
+        "mouthLowerDownRight",
+        "mouthStretchLeft",
+        "mouthStretchRight",
+        "mouthSmileLeft",
+        "mouthSmileRight",
+    }
+    return [index for index, name in enumerate(BLENDSHAPE_NAMES) if name in focus]

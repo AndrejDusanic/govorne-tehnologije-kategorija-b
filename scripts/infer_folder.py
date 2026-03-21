@@ -13,10 +13,10 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from blendshape_project.checkpoint_utils import load_model_bundle, predict_raw_blendshapes  # noqa: E402
 from blendshape_project.constants import DEFAULT_FPS, SPEAKER_ORDER  # noqa: E402
-from blendshape_project.data import AudioFeatureExtractor, DatasetStats, load_waveform, unnormalize_targets  # noqa: E402
+from blendshape_project.data import AudioFeatureExtractor, load_waveform, text_to_char_ids  # noqa: E402
 from blendshape_project.io_utils import save_json, write_blendshape_csv  # noqa: E402
-from blendshape_project.model import BlendshapeRegressor  # noqa: E402
 
 
 def select_device(requested: str) -> torch.device:
@@ -35,42 +35,39 @@ def infer_speaker_id(filename: str, speaker_to_id: dict[str, int], default_speak
     return speaker_to_id[default_speaker]
 
 
+def read_text_for_audio(wav_path: Path, text_dir: Path | None, default_text: str) -> str:
+    if text_dir is None:
+        return default_text
+    text_path = text_dir / f"{wav_path.stem}.txt"
+    if text_path.exists():
+        return text_path.read_text(encoding="utf-8").strip()
+    return default_text
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run inference over a folder of WAV files.")
-    parser.add_argument("--checkpoint", type=Path, required=True)
+    parser.add_argument("--checkpoint", type=Path, nargs="+", required=True)
     parser.add_argument("--input-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, default=ROOT / "artifacts" / "predictions")
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--default-speaker", type=str, choices=SPEAKER_ORDER, default="spk08")
+    parser.add_argument("--text-dir", type=Path, default=None)
+    parser.add_argument("--default-text", type=str, default="")
     parser.add_argument("--fps", type=int, default=DEFAULT_FPS)
     args = parser.parse_args()
 
     device = select_device(args.device)
-    checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
-    stats = DatasetStats.from_json(checkpoint["stats"])
-    speaker_to_id = checkpoint.get("speaker_to_id", {speaker: idx for idx, speaker in enumerate(SPEAKER_ORDER)})
-
     feature_extractor = AudioFeatureExtractor(fps=args.fps)
-    model = BlendshapeRegressor(
-        input_dim=feature_extractor.feature_dim,
-        num_blendshapes=len(checkpoint["blendshape_names"]),
-        num_speakers=len(speaker_to_id),
-        num_phonemes=len(checkpoint["phoneme_vocab"]),
-        hidden_size=checkpoint["config"].get("hidden_size", 256),
-        dropout=checkpoint["config"].get("dropout", 0.12),
-    ).to(device)
-    model.load_state_dict(checkpoint["model_state"])
-    model.eval()
-
-    feature_mean = torch.tensor(stats.feature_mean, dtype=torch.float32, device=device)
-    feature_std = torch.tensor(stats.feature_std, dtype=torch.float32, device=device)
+    bundles = [load_model_bundle(checkpoint, device=device, feature_dim=feature_extractor.feature_dim) for checkpoint in args.checkpoint]
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     wav_paths = sorted(args.input_dir.glob("*.wav"))
     meta = {
         "system": {
-            "lookahead_ms": 0,
+            "lookahead_ms": -1 if any(bundle.config.get("temporal_encoder", "causal_tcn") == "bgru" for bundle in bundles) else 0,
             "fps_out": args.fps,
+            "ensemble_size": len(bundles),
+            "checkpoints": [f"{bundle.checkpoint_path.parent.name}/{bundle.checkpoint_path.name}" for bundle in bundles],
         },
         "files": {},
     }
@@ -79,15 +76,29 @@ def main() -> None:
         for wav_path in wav_paths:
             waveform = load_waveform(wav_path, feature_extractor.sample_rate)
             target_frames = max(1, int(round(waveform.shape[-1] / feature_extractor.sample_rate * args.fps)))
-            features = feature_extractor(waveform, target_frames=target_frames).to(device)
-            features = (features - feature_mean) / feature_std
-            speaker_id = infer_speaker_id(wav_path.stem, speaker_to_id, args.default_speaker)
+            raw_features = feature_extractor(waveform, target_frames=target_frames).float().to(device)
+            lengths = torch.tensor([target_frames], dtype=torch.long, device=device)
+            text = read_text_for_audio(wav_path, args.text_dir, args.default_text)
 
             start_time = time.perf_counter()
-            outputs = model(features.unsqueeze(0), torch.tensor([speaker_id], device=device))
+            raw_predictions = []
+            for bundle in bundles:
+                speaker_id = infer_speaker_id(wav_path.stem, bundle.speaker_to_id, args.default_speaker)
+                speaker_ids = torch.tensor([speaker_id], dtype=torch.long, device=device)
+                text_ids = text_to_char_ids(text, bundle.char_vocab).unsqueeze(0).to(device)
+                text_lengths = torch.tensor([text_ids.shape[1]], dtype=torch.long, device=device)
+                prediction = predict_raw_blendshapes(
+                    bundle,
+                    features=raw_features.unsqueeze(0),
+                    speaker_ids=speaker_ids,
+                    lengths=lengths,
+                    text_ids=text_ids,
+                    text_lengths=text_lengths,
+                )
+                raw_predictions.append(prediction.squeeze(0))
             elapsed = time.perf_counter() - start_time
 
-            prediction = unnormalize_targets(outputs["blendshapes"], stats).squeeze(0).cpu().numpy()
+            prediction = torch.stack(raw_predictions, dim=0).mean(dim=0).cpu().numpy()
             prediction = np.clip(prediction, 0.0, 1.0)
             output_csv = args.output_dir / f"{wav_path.stem}.csv"
             write_blendshape_csv(output_csv, prediction)
@@ -95,6 +106,7 @@ def main() -> None:
             duration_sec = waveform.shape[-1] / feature_extractor.sample_rate
             meta["files"][wav_path.name] = {
                 "csv_path": output_csv.name,
+                "text_used": text,
                 "inference_time_sec": elapsed,
                 "rtf": elapsed / max(duration_sec, 1e-6),
             }

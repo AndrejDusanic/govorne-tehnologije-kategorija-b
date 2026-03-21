@@ -10,3 +10,8 @@ data/cache/
 data/extracted/
 data/extracted/avatar/
 artifacts/tmp/
+artifacts/checkpoints/*/last.pt
+artifacts/checkpoints/improved_cpu_eval/
+artifacts/checkpoints/improved_smoke/
+reports/figures/compat_eval/
+reports/figures/single_baseline_check/

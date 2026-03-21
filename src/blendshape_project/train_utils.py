@@ -9,7 +9,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from .constants import BLENDSHAPE_NAMES, blendshape_priority_weights
+from .constants import BLENDSHAPE_NAMES, blendshape_focus_indices, blendshape_priority_weights
 from .data import DatasetStats, unnormalize_targets
 
 
@@ -24,39 +24,62 @@ def compute_losses(
     batch: dict[str, torch.Tensor],
     phoneme_loss_weight: float = 0.2,
     temporal_loss_weight: float = 0.1,
+    activity_loss_weight: float = 2.0,
+    peak_loss_weight: float = 0.2,
+    activity_gamma: float = 1.5,
     coefficient_weights: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
     predictions = outputs["blendshapes"]
     targets = batch["targets"]
     mask = batch["target_mask"].unsqueeze(-1).float()
+    target_activity = batch["target_activity"].to(predictions.device)
     coeffs = coefficient_weights
     if coeffs is None:
         coeffs = torch.tensor(blendshape_priority_weights(), device=predictions.device, dtype=predictions.dtype)
     coeffs = coeffs.view(1, 1, -1)
+    activity_weights = 1.0 + activity_loss_weight * target_activity.pow(activity_gamma)
+    combined_weights = coeffs * activity_weights * mask
 
-    reg_residual = (predictions - targets).abs() * coeffs * mask
-    reg_denom = (mask.sum() * coeffs.sum()).clamp_min(1.0)
+    reg_residual = F.smooth_l1_loss(predictions, targets, reduction="none") * combined_weights
+    reg_denom = combined_weights.sum().clamp_min(1.0)
     regression_loss = reg_residual.sum() / reg_denom
 
     if predictions.shape[1] > 1:
         delta_pred = predictions[:, 1:] - predictions[:, :-1]
         delta_target = targets[:, 1:] - targets[:, :-1]
         delta_mask = (batch["target_mask"][:, 1:] & batch["target_mask"][:, :-1]).unsqueeze(-1).float()
-        temporal_residual = (delta_pred - delta_target).abs() * coeffs * delta_mask
-        temporal_denom = (delta_mask.sum() * coeffs.sum()).clamp_min(1.0)
+        delta_activity = torch.maximum(target_activity[:, 1:], target_activity[:, :-1])
+        delta_weights = coeffs * (1.0 + activity_loss_weight * delta_activity.pow(activity_gamma)) * delta_mask
+        temporal_residual = F.smooth_l1_loss(delta_pred, delta_target, reduction="none") * delta_weights
+        temporal_denom = delta_weights.sum().clamp_min(1.0)
         temporal_loss = temporal_residual.sum() / temporal_denom
     else:
         temporal_loss = predictions.new_tensor(0.0)
+
+    focus_indices = blendshape_focus_indices()
+    if focus_indices:
+        focus_pred = predictions[:, :, focus_indices].transpose(1, 2)
+        focus_target = targets[:, :, focus_indices].transpose(1, 2)
+        focus_activity = target_activity[:, :, focus_indices].transpose(1, 2)
+        focus_mask = batch["target_mask"].unsqueeze(-1).float().expand(-1, -1, len(focus_indices)).transpose(1, 2)
+        pooled_pred = F.max_pool1d(focus_pred, kernel_size=7, stride=1, padding=3)
+        pooled_target = F.max_pool1d(focus_target, kernel_size=7, stride=1, padding=3)
+        peak_weights = (1.0 + activity_loss_weight * focus_activity.pow(activity_gamma)) * focus_mask
+        peak_residual = F.smooth_l1_loss(pooled_pred, pooled_target, reduction="none") * peak_weights
+        peak_loss = peak_residual.sum() / peak_weights.sum().clamp_min(1.0)
+    else:
+        peak_loss = predictions.new_tensor(0.0)
 
     phoneme_logits = outputs["phonemes"].reshape(-1, outputs["phonemes"].shape[-1])
     phoneme_targets = batch["phoneme_ids"].reshape(-1)
     phoneme_loss = F.cross_entropy(phoneme_logits, phoneme_targets, ignore_index=-100)
 
-    total_loss = regression_loss + temporal_loss_weight * temporal_loss + phoneme_loss_weight * phoneme_loss
+    total_loss = regression_loss + temporal_loss_weight * temporal_loss + phoneme_loss_weight * phoneme_loss + peak_loss_weight * peak_loss
     return {
         "loss": total_loss,
         "regression_loss": regression_loss.detach(),
         "temporal_loss": temporal_loss.detach(),
+        "peak_loss": peak_loss.detach(),
         "phoneme_loss": phoneme_loss.detach(),
     }
 
@@ -91,7 +114,13 @@ def evaluate_model(
         targets = batch["targets"].to(device)
         mask = batch["target_mask"].to(device)
 
-        outputs = model(features, speaker_ids)
+        outputs = model(
+            features,
+            speaker_ids,
+            lengths=batch["lengths"].to(device),
+            text_ids=batch["text_ids"].to(device),
+            text_lengths=batch["text_lengths"].to(device),
+        )
         predictions = outputs["blendshapes"]
 
         predictions_raw = unnormalize_targets(predictions, stats)
