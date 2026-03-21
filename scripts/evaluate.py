@@ -20,6 +20,15 @@ from blendshape_project.model import BlendshapeRegressor  # noqa: E402
 from blendshape_project.train_utils import evaluate_model, save_overlay_plot, save_per_blendshape_plot  # noqa: E402
 
 
+def select_device(requested: str) -> torch.device:
+    if requested == "auto":
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if requested == "cuda" and not torch.cuda.is_available():
+        print("CUDA was requested but is not available. Falling back to CPU.")
+        return torch.device("cpu")
+    return torch.device(requested)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate a saved checkpoint on the validation split.")
     parser.add_argument("--checkpoint", type=Path, required=True)
@@ -29,7 +38,7 @@ def main() -> None:
     parser.add_argument("--device", type=str, default="auto")
     args = parser.parse_args()
 
-    device = torch.device("cuda" if args.device == "auto" and torch.cuda.is_available() else ("cpu" if args.device == "auto" else args.device))
+    device = select_device(args.device)
     checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
     stats = DatasetStats.from_json(checkpoint["stats"])
     speaker_to_id = checkpoint.get("speaker_to_id", {speaker: idx for idx, speaker in enumerate(SPEAKER_ORDER)})

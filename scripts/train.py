@@ -37,6 +37,9 @@ from blendshape_project.train_utils import (  # noqa: E402
 def select_device(requested: str) -> torch.device:
     if requested == "auto":
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if requested == "cuda" and not torch.cuda.is_available():
+        print("CUDA was requested but is not available. Falling back to CPU.")
+        return torch.device("cpu")
     return torch.device(requested)
 
 

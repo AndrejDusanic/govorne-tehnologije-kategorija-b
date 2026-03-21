@@ -19,6 +19,15 @@ from blendshape_project.io_utils import save_json, write_blendshape_csv  # noqa:
 from blendshape_project.model import BlendshapeRegressor  # noqa: E402
 
 
+def select_device(requested: str) -> torch.device:
+    if requested == "auto":
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if requested == "cuda" and not torch.cuda.is_available():
+        print("CUDA was requested but is not available. Falling back to CPU.")
+        return torch.device("cpu")
+    return torch.device(requested)
+
+
 def infer_speaker_id(filename: str, speaker_to_id: dict[str, int], default_speaker: str) -> int:
     prefix = filename.split("_")[0]
     if prefix in speaker_to_id:
@@ -36,7 +45,7 @@ def main() -> None:
     parser.add_argument("--fps", type=int, default=DEFAULT_FPS)
     args = parser.parse_args()
 
-    device = torch.device("cuda" if args.device == "auto" and torch.cuda.is_available() else ("cpu" if args.device == "auto" else args.device))
+    device = select_device(args.device)
     checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
     stats = DatasetStats.from_json(checkpoint["stats"])
     speaker_to_id = checkpoint.get("speaker_to_id", {speaker: idx for idx, speaker in enumerate(SPEAKER_ORDER)})
