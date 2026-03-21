@@ -101,6 +101,94 @@ git lfs install
 git lfs pull
 ```
 
+## GitHub private repo setup
+
+Predlozeni naziv private repoa:
+
+- `govorne-tehnologije-kategorija-b`
+
+U repou treba da ostanu:
+
+- `src/`
+- `scripts/`
+- `notebooks/`
+- `requirements.txt`
+- `README.md`
+- `.gitignore`
+- `.gitattributes`
+- originalni ZIP fajlovi i PDF
+- `artifacts/checkpoints/baseline_full_v1/` ako zelis odmah imati gotov model u Colabu
+
+U repou ne treba da budu:
+
+- `data/extracted/`
+- `artifacts/tmp/`
+- cache folderi
+
+Za lokalno povezivanje na GitHub koristi helper skriptu:
+
+```powershell
+python scripts/setup_github_remote.py --username YOUR_GITHUB_USERNAME
+```
+
+Ako hoces odmah i push:
+
+```powershell
+python scripts/setup_github_remote.py --username YOUR_GITHUB_USERNAME --push
+```
+
+Ako zelis samo da vidis koji ce URL biti postavljen:
+
+```powershell
+python scripts/setup_github_remote.py --username YOUR_GITHUB_USERNAME --print-only
+```
+
+## Colab quick start
+
+Najbrzi nacin nakon kloniranja repoa u Colabu:
+
+```bash
+bash scripts/colab_bootstrap.sh --with-analysis
+```
+
+To radi:
+
+- `git lfs install`
+- `git lfs pull`
+- `pip install -r requirements.txt`
+- `python scripts/prepare_data.py`
+- opciono `python scripts/analyze_data.py`
+
+Ako hoces rucno:
+
+```bash
+!apt-get -qq update
+!apt-get -qq install -y git-lfs
+!git lfs install
+!git lfs pull
+!python -m pip install -r requirements.txt
+!python scripts/prepare_data.py
+!python scripts/analyze_data.py
+```
+
+Ako hoces samo evaluaciju vec istreniranog modela:
+
+```bash
+!python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt --device cuda
+```
+
+Ako hoces trening u Colabu:
+
+```bash
+!python scripts/train.py --run-name colab_full_run --epochs 18 --batch-size 8 --device cuda
+```
+
+Ako hoces inferencu nad test WAV folderom:
+
+```bash
+!python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt --input-dir test_wavs --output-dir artifacts/predictions/colab_test --device cuda
+```
+
 ## Model u jednoj recenici
 
 Model koristi log-mel + delta + delta-delta audio feature-e na `60 FPS`, speaker conditioning i causal dilated temporal blokove, uz dodatni fonemski supervision iz `labels_aligned` skupa.
@@ -112,4 +200,3 @@ Model koristi log-mel + delta + delta-delta audio feature-e na `60 FPS`, speaker
 - poseban loss za lipsync koeficijente sa vecim tezinama
 - dva moda: `offline best-quality` i `strict causal low-latency`
 - k-fold validacija prije finalnog treninga
-
