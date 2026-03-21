@@ -17,6 +17,7 @@ if str(SRC) not in sys.path:
 from blendshape_project.checkpoint_utils import load_model_bundle, predict_raw_blendshapes  # noqa: E402
 from blendshape_project.constants import DEFAULT_FPS, SPEAKER_ORDER  # noqa: E402
 from blendshape_project.data import AudioFeatureExtractor, load_waveform, text_to_char_ids  # noqa: E402
+from blendshape_project.face_refiner import apply_face_refiner, load_face_refiner  # noqa: E402
 from blendshape_project.io_utils import save_json, write_blendshape_csv  # noqa: E402
 
 
@@ -54,12 +55,15 @@ def main() -> None:
     parser.add_argument("--default-speaker", type=str, choices=SPEAKER_ORDER, default="spk08")
     parser.add_argument("--text-dir", type=Path, default=None)
     parser.add_argument("--default-text", type=str, default="")
+    parser.add_argument("--face-refiner", type=Path, default=None)
+    parser.add_argument("--face-refiner-strength", type=float, default=None)
     parser.add_argument("--fps", type=int, default=DEFAULT_FPS)
     args = parser.parse_args()
 
     device = select_device(args.device)
     feature_extractor = AudioFeatureExtractor(fps=args.fps)
     bundles = [load_model_bundle(checkpoint, device=device, feature_dim=feature_extractor.feature_dim) for checkpoint in args.checkpoint]
+    face_refiner = load_face_refiner(args.face_refiner, device=device) if args.face_refiner is not None else None
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     wav_paths = sorted(args.input_dir.glob("*.wav"))
@@ -69,6 +73,12 @@ def main() -> None:
             "fps_out": args.fps,
             "ensemble_size": len(bundles),
             "checkpoints": [f"{bundle.checkpoint_path.parent.name}/{bundle.checkpoint_path.name}" for bundle in bundles],
+            "face_refiner": str(args.face_refiner) if args.face_refiner is not None else None,
+            "face_refiner_strength": (
+                args.face_refiner_strength
+                if args.face_refiner_strength is not None
+                else (face_refiner.default_strength if face_refiner is not None else None)
+            ),
         },
         "files": {},
     }
@@ -100,7 +110,15 @@ def main() -> None:
                 raw_predictions.append(prediction.squeeze(0))
             elapsed = time.perf_counter() - start_time
 
-            prediction = torch.stack(raw_predictions, dim=0).mean(dim=0).cpu().numpy()
+            prediction = torch.stack(raw_predictions, dim=0).mean(dim=0).unsqueeze(0)
+            if face_refiner is not None:
+                prediction = apply_face_refiner(
+                    prediction,
+                    face_refiner,
+                    strength=args.face_refiner_strength,
+                    clamp=True,
+                )
+            prediction = prediction.squeeze(0).cpu().numpy()
             prediction = np.clip(prediction, 0.0, 1.0)
             output_csv = args.output_dir / f"{wav_path.stem}.csv"
             write_blendshape_csv(output_csv, prediction)

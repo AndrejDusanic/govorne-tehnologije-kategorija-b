@@ -11,31 +11,35 @@ Trenutno je implementiran i provjeren kompletan audio-driven pipeline:
 - bidirectional temporal encoder za kvalitetniji offline mod
 - multitask trening sa pomocnim fonemskim loss-om
 - activity/peak weighted loss za teze usne blendshape-ove
+- learned face refiner koji pojacava podaktivne brow/eye/nose koeficijente bez rusenja stabilnosti
 - evaluacija sa grafikonima
 - inferenca koja generise `CSV` i `meta.json`
 - Colab notebook za pokretanje svega iz Git repozitorija
 
 ## Trenutni najbolji rezultat
 
-Najbolji setup koji je trenutno spreman u repou je ensemble ova dva checkpointa:
+Najbolji setup koji je trenutno spreman u repou je ensemble ova dva checkpointa plus learned face refiner:
 
 - `artifacts/checkpoints/baseline_full_v1/best.pt`
 - `artifacts/checkpoints/hybrid_bgru_v1/best.pt`
+- `artifacts/refiners/ensemble_face_refiner_v1.npz`
 
 Ensemble rezultat na validation splitu:
 
-- Validation MAE: `0.0185569`
-- Validation RMSE: `0.0432647`
-- Mouth-only MAE: `0.0224074`
-- JawOpen MAE: `0.0244156`
+- Validation MAE: `0.0184445`
+- Validation RMSE: `0.0428856`
+- Mouth-only MAE: `0.0222742`
+- JawOpen MAE: `0.0243837`
 
-Najbolji pojedinacni checkpoint po MAE i dalje je `baseline_full_v1`, dok `hybrid_bgru_v1` sluzi kao drugi clan ensemble-a i popravlja ukupan skor kada se prosjece raw predikcije.
+Najbolji pojedinacni checkpoint po MAE i dalje je `baseline_full_v1`, dok `hybrid_bgru_v1` sluzi kao drugi clan ensemble-a i popravlja ukupan skor kada se prosjece raw predikcije. Face refiner se zatim primjenjuje nad ensemble izlazom i dize dinamiku gornjeg dijela lica, posebno za `browDown*`, `eyeBlink*`, `eyeLookDown*` i `noseSneer*`.
 
 Najvazniji grafici su vec generisani:
 
 - `reports/figures/dataset_overview.png`
 - `reports/figures/blendshape_activity.png`
 - `reports/figures/phoneme_distribution.png`
+- `reports/figures/ensemble_refined_default/validation_per_blendshape_mae.png`
+- `reports/figures/ensemble_refined_default/ensemble_spk08_001_overlay.png`
 - `reports/figures/ensemble_default/validation_per_blendshape_mae.png`
 - `reports/figures/ensemble_default/ensemble_spk08_001_overlay.png`
 - `artifacts/checkpoints/baseline_full_v1/training_curves.png`
@@ -54,16 +58,22 @@ Najvazniji grafici su vec generisani:
   - pravi EDA grafike
 - `scripts/train.py`
   - trenira model i cuva checkpoint + grafike
+- `scripts/train_face_refiner.py`
+  - trenira learned post-processing refiner nad jednim ili vise checkpointa
 - `scripts/evaluate.py`
-  - evaluacija nad validation splitom za jedan checkpoint ili ensemble
+  - evaluacija nad validation splitom za jedan checkpoint ili ensemble, uz opcioni face refiner
 - `scripts/infer_folder.py`
-  - inferenca nad folderom sa `.wav` fajlovima za jedan checkpoint ili ensemble
+  - inferenca nad folderom sa `.wav` fajlovima za jedan checkpoint ili ensemble, uz opcioni face refiner
+- `src/blendshape_project/face_refiner.py`
+  - helper kod za learned full-face refinement
 - `notebooks/competition_pipeline_colab.ipynb`
   - Colab workflow
 - `artifacts/checkpoints/baseline_full_v1/`
   - najbolji pojedinacni checkpoint
 - `artifacts/checkpoints/hybrid_bgru_v1/`
   - hibridni `bgru` checkpoint za ensemble
+- `artifacts/refiners/`
+  - spremljen face refiner i njegove metrike
 
 ## Brzi start lokalno
 
@@ -83,7 +93,7 @@ python scripts/analyze_data.py
 3. Najbrza provjera najboljeg spremnog setupa:
 
 ```powershell
-python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/hybrid_bgru_v1/best.pt --device cuda
+python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/hybrid_bgru_v1/best.pt --face-refiner artifacts/refiners/ensemble_face_refiner_v1.npz --device cuda
 ```
 
 4. Trening novog jaceg offline modela:
@@ -107,7 +117,7 @@ python scripts/evaluate.py --checkpoint artifacts/checkpoints/improved_full_run/
 6. Inferenca nad novim audio fajlovima sa najboljim spremnim ensemble-om:
 
 ```powershell
-python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/hybrid_bgru_v1/best.pt --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda
+python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/hybrid_bgru_v1/best.pt --face-refiner artifacts/refiners/ensemble_face_refiner_v1.npz --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda
 ```
 
 7. Inferenca nad novim audio fajlovima sa svojim novim runom:
@@ -152,11 +162,13 @@ U repou treba da ostanu:
 - originalni ZIP fajlovi i PDF
 - `artifacts/checkpoints/baseline_full_v1/`
 - `artifacts/checkpoints/hybrid_bgru_v1/`
+- `artifacts/refiners/`
 
 U repou ne treba da budu:
 
 - `data/extracted/`
 - `artifacts/tmp/`
+- lokalni avatar demo outputi
 - cache folderi
 
 Za lokalno povezivanje na GitHub koristi helper skriptu:
@@ -208,7 +220,7 @@ Ako hoces rucno:
 Ako hoces samo evaluaciju vec istreniranog modela:
 
 ```bash
-!python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/hybrid_bgru_v1/best.pt --device cuda
+!python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/hybrid_bgru_v1/best.pt --face-refiner artifacts/refiners/ensemble_face_refiner_v1.npz --device cuda
 ```
 
 Ako hoces trening u Colabu:
@@ -220,19 +232,20 @@ Ako hoces trening u Colabu:
 Ako hoces inferencu nad test WAV folderom:
 
 ```bash
-!python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/hybrid_bgru_v1/best.pt --input-dir test_wavs --output-dir artifacts/predictions/colab_test --device cuda
+!python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/hybrid_bgru_v1/best.pt --face-refiner artifacts/refiners/ensemble_face_refiner_v1.npz --input-dir test_wavs --output-dir artifacts/predictions/colab_test --device cuda
 ```
 
 ## Model u jednoj recenici
 
-Novi default model koristi log-mel + delta + delta-delta audio feature-e na `60 FPS`, speaker conditioning, text conditioning preko karakter-level attention grane i bidirectional GRU temporal encoder, uz dodatni fonemski supervision i peak-aware loss za usne koeficijente.
+Novi default model koristi log-mel + delta + delta-delta audio feature-e na `60 FPS`, speaker conditioning, text conditioning preko karakter-level attention grane i bidirectional GRU temporal encoder, uz dodatni fonemski supervision, peak-aware loss za usne koeficijente i learned face refiner za jacu mimiku cijelog lica.
 
-`scripts/evaluate.py` i `scripts/infer_folder.py` sada podrzavaju vise `--checkpoint` argumenata i rade raw-space averaging, pa dobijes ensemble bez dodatnog koda.
+`scripts/evaluate.py` i `scripts/infer_folder.py` sada podrzavaju vise `--checkpoint` argumenata i rade raw-space averaging, a zatim opciono i face refinement, pa dobijes ensemble bez dodatnog koda.
 
 ## Ideje za jos bolji plasman
 
 - pseudo-labeling nad `audio_synth`
-- dodatni smoothing/post-processing po blendshape grupama
+- jaci multimodal encoder tipa Conformer ili pretrained speech backbone (`HuBERT`/`WavLM`)
+- speaker- i phoneme-aware refiner treniran i na sintetickom domenu
 - dva moda: `offline best-quality` i `strict causal low-latency`
 - k-fold validacija prije finalnog treninga
 

@@ -16,6 +16,7 @@ if str(SRC) not in sys.path:
 
 from blendshape_project.checkpoint_utils import load_model_bundle, predict_raw_blendshapes  # noqa: E402
 from blendshape_project.data import AudioFeatureExtractor, BlendshapeDataset, collate_batch  # noqa: E402
+from blendshape_project.face_refiner import apply_face_refiner, load_face_refiner  # noqa: E402
 from blendshape_project.io_utils import load_json, save_json  # noqa: E402
 from blendshape_project.train_utils import save_overlay_plot, save_per_blendshape_plot  # noqa: E402
 
@@ -33,6 +34,8 @@ def evaluate_bundles(
     bundles: list,
     loaders: list[DataLoader],
     device: torch.device,
+    face_refiner=None,
+    face_refiner_strength: float | None = None,
 ) -> dict[str, object]:
     blendshape_names = bundles[0].blendshape_names
     total_abs_error = 0.0
@@ -67,6 +70,13 @@ def evaluate_bundles(
                 predictions_raw.append(prediction)
 
             ensemble_prediction = torch.stack(predictions_raw, dim=0).mean(dim=0)
+            if face_refiner is not None:
+                ensemble_prediction = apply_face_refiner(
+                    ensemble_prediction,
+                    face_refiner,
+                    strength=face_refiner_strength,
+                    clamp=True,
+                )
             targets_raw = reference_batch["targets"].to(device)
 
             valid = mask.unsqueeze(-1).expand_as(ensemble_prediction)
@@ -113,12 +123,15 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, default=ROOT / "data" / "manifests" / "natural_samples.csv")
     parser.add_argument("--split-json", type=Path, default=ROOT / "data" / "manifests" / "split.json")
     parser.add_argument("--output-dir", type=Path, default=ROOT / "reports" / "figures")
+    parser.add_argument("--face-refiner", type=Path, default=None)
+    parser.add_argument("--face-refiner-strength", type=float, default=None)
     parser.add_argument("--device", type=str, default="auto")
     args = parser.parse_args()
 
     device = select_device(args.device)
     feature_extractor = AudioFeatureExtractor()
     bundles = [load_model_bundle(checkpoint, device=device, feature_dim=feature_extractor.feature_dim) for checkpoint in args.checkpoint]
+    face_refiner = load_face_refiner(args.face_refiner, device=device) if args.face_refiner is not None else None
 
     frame = pd.read_csv(args.manifest)
     split = load_json(args.split_json)
@@ -136,7 +149,13 @@ def main() -> None:
         )
         loaders.append(DataLoader(dataset, batch_size=4, shuffle=False, collate_fn=collate_batch))
 
-    metrics = evaluate_bundles(bundles, loaders, device)
+    metrics = evaluate_bundles(
+        bundles,
+        loaders,
+        device,
+        face_refiner=face_refiner,
+        face_refiner_strength=args.face_refiner_strength,
+    )
     args.output_dir.mkdir(parents=True, exist_ok=True)
     save_json(
         args.output_dir / "validation_metrics.json",
@@ -145,6 +164,12 @@ def main() -> None:
             "samples": [],
             "checkpoints": [str(bundle.checkpoint_path) for bundle in bundles],
             "ensemble_size": len(bundles),
+            "face_refiner": str(args.face_refiner) if args.face_refiner is not None else None,
+            "face_refiner_strength": (
+                args.face_refiner_strength
+                if args.face_refiner_strength is not None
+                else (face_refiner.default_strength if face_refiner is not None else None)
+            ),
         },
     )
     save_per_blendshape_plot(metrics["per_dim_mae"], args.output_dir / "validation_per_blendshape_mae.png")
