@@ -19,8 +19,11 @@ artifacts/predictions/avatar_demo_synth_refined/
 artifacts/predictions/avatar_demo_synth_refined_blinks/
 artifacts/predictions/synth_test/
 artifacts/predictions/synth_test_refined/
+artifacts/predictions/final_test_submission/
+artifacts/predictions/final_test_avatar_ready/
 artifacts/checkpoints/*/last.pt
 artifacts/checkpoints/improved_cpu_eval/
 artifacts/checkpoints/improved_smoke/
 reports/figures/compat_eval/
 reports/figures/single_baseline_check/
+test_set_catB.zip

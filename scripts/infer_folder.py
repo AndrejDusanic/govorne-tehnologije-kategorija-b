@@ -70,7 +70,11 @@ def main() -> None:
     face_refiner = load_face_refiner(args.face_refiner, device=device) if args.face_refiner is not None else None
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    wav_paths = sorted(args.input_dir.glob("*.wav"))
+    audio_paths = sorted(
+        path
+        for pattern in ("*.wav", "*.mp3", "*.flac", "*.ogg", "*.m4a")
+        for path in args.input_dir.glob(pattern)
+    )
     meta = {
         "system": {
             "lookahead_ms": 0,
@@ -92,7 +96,7 @@ def main() -> None:
     max_duration_sec = 0.0
 
     with torch.no_grad():
-        for wav_path in wav_paths:
+        for wav_path in audio_paths:
             waveform = load_waveform(wav_path, feature_extractor.sample_rate)
             target_frames = max(1, int(round(waveform.shape[-1] / feature_extractor.sample_rate * args.fps)))
             raw_features = feature_extractor(waveform, target_frames=target_frames).float().to(device)
@@ -154,7 +158,7 @@ def main() -> None:
         meta["system"]["lookahead_ms"] = int(math.ceil(max_duration_sec * 1000.0))
 
     save_json(args.output_dir / "meta.json", meta)
-    print(f"Inference completed for {len(wav_paths)} files.")
+    print(f"Inference completed for {len(audio_paths)} files.")
 
 
 if __name__ == "__main__":

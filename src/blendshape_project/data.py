@@ -7,6 +7,7 @@ import warnings
 
 import numpy as np
 import pandas as pd
+import soundfile as sf
 import torch
 import torch.nn.functional as F
 import torchaudio
@@ -113,6 +114,14 @@ class AudioFeatureExtractor:
 
 
 def load_waveform(audio_path: str | Path, target_sr: int = DEFAULT_SAMPLE_RATE) -> torch.Tensor:
+    audio_path = Path(audio_path)
+    if audio_path.suffix.lower() != ".wav":
+        waveform_np, sample_rate = sf.read(str(audio_path), dtype="float32", always_2d=True)
+        waveform = torch.from_numpy(waveform_np.T.copy())
+        if sample_rate != target_sr:
+            waveform = torchaudio.functional.resample(waveform, sample_rate, target_sr)
+        return waveform
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", WavFileWarning)
         sample_rate, waveform_np = wavfile.read(str(audio_path))

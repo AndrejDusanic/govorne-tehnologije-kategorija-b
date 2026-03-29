@@ -8,4 +8,4 @@ pypdf>=6.0
 tqdm>=4.66
 torch>=2.6
 torchaudio>=2.6
-
+soundfile
