@@ -13,8 +13,10 @@ artifacts/tmp/
 artifacts/avatar_app/
 artifacts/predictions/avatar_demo/
 artifacts/predictions/avatar_demo_refined/
+artifacts/predictions/avatar_demo_refined_blinks/
 artifacts/predictions/avatar_demo_synth/
 artifacts/predictions/avatar_demo_synth_refined/
+artifacts/predictions/avatar_demo_synth_refined_blinks/
 artifacts/predictions/synth_test/
 artifacts/predictions/synth_test_refined/
 artifacts/checkpoints/*/last.pt

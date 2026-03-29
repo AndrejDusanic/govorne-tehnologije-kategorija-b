@@ -15,6 +15,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from blendshape_project.checkpoint_utils import load_model_bundle, predict_raw_blendshapes  # noqa: E402
+from blendshape_project.blink_postprocess import apply_random_blinks  # noqa: E402
 from blendshape_project.constants import DEFAULT_FPS, SPEAKER_ORDER  # noqa: E402
 from blendshape_project.data import AudioFeatureExtractor, load_waveform, text_to_char_ids  # noqa: E402
 from blendshape_project.face_refiner import apply_face_refiner, load_face_refiner  # noqa: E402
@@ -57,6 +58,9 @@ def main() -> None:
     parser.add_argument("--default-text", type=str, default="")
     parser.add_argument("--face-refiner", type=Path, default=None)
     parser.add_argument("--face-refiner-strength", type=float, default=None)
+    parser.add_argument("--random-blinks", action="store_true")
+    parser.add_argument("--blink-strength", type=float, default=1.0)
+    parser.add_argument("--blink-seed", type=int, default=1337)
     parser.add_argument("--fps", type=int, default=DEFAULT_FPS)
     args = parser.parse_args()
 
@@ -79,6 +83,9 @@ def main() -> None:
                 if args.face_refiner_strength is not None
                 else (face_refiner.default_strength if face_refiner is not None else None)
             ),
+            "random_blinks": args.random_blinks,
+            "blink_strength": args.blink_strength if args.random_blinks else None,
+            "blink_seed": args.blink_seed if args.random_blinks else None,
         },
         "files": {},
     }
@@ -119,6 +126,16 @@ def main() -> None:
                     clamp=True,
                 )
             prediction = prediction.squeeze(0).cpu().numpy()
+            blink_info = None
+            if args.random_blinks:
+                prediction, blink_info = apply_random_blinks(
+                    prediction,
+                    fps=args.fps,
+                    seed=args.blink_seed,
+                    file_key=wav_path.stem,
+                    strength=args.blink_strength,
+                    return_info=True,
+                )
             prediction = np.clip(prediction, 0.0, 1.0)
             output_csv = args.output_dir / f"{wav_path.stem}.csv"
             write_blendshape_csv(output_csv, prediction)
@@ -130,6 +147,7 @@ def main() -> None:
                 "text_used": text,
                 "inference_time_sec": elapsed,
                 "rtf": elapsed / max(duration_sec, 1e-6),
+                "blink_postprocess": blink_info,
             }
 
     if any(bundle.config.get("temporal_encoder", "causal_tcn") == "bgru" for bundle in bundles):

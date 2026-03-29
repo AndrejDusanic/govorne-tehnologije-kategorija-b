@@ -64,8 +64,12 @@ Najvazniji grafici su vec generisani:
   - evaluacija nad validation splitom za jedan checkpoint ili ensemble, uz opcioni face refiner
 - `scripts/infer_folder.py`
   - inferenca nad folderom sa `.wav` fajlovima za jedan checkpoint ili ensemble, uz opcioni face refiner
+- `scripts/postprocess_blinks.py`
+  - dodaje reproducibilna nasumicna treptanja nad vec generisanim `CSV` fajlovima za avatar demo
 - `src/blendshape_project/face_refiner.py`
   - helper kod za learned full-face refinement
+- `src/blendshape_project/blink_postprocess.py`
+  - helper kod za random blink post-processing
 - `notebooks/competition_pipeline_colab.ipynb`
   - Colab workflow
 - `artifacts/checkpoints/baseline_full_v1/`
@@ -124,6 +128,18 @@ python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_
 
 ```powershell
 python scripts/infer_folder.py --checkpoint artifacts/checkpoints/improved_full_run/best.pt --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda
+```
+
+8. Ako hoces da avatar povremeno trepce u demou, dodaj blink post-processing direktno u inferenci:
+
+```powershell
+python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/hybrid_bgru_v1/best.pt --face-refiner artifacts/refiners/ensemble_face_refiner_v1.npz --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda --random-blinks --blink-strength 1.0
+```
+
+9. Ako vec imas generisane `CSV` fajlove i samo hoces blink verziju za avatar:
+
+```powershell
+python scripts/postprocess_blinks.py --input-dir artifacts/predictions/avatar_demo_synth_refined --output-dir artifacts/predictions/avatar_demo_synth_refined_blinks --audio-dir artifacts/predictions/avatar_demo_synth_refined
 ```
 
 ## Colab workflow
