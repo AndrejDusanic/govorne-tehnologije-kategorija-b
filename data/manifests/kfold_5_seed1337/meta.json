@@ -1,0 +1,12 @@
+{
+  "manifest": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\data\\manifests\\natural_samples.csv",
+  "n_folds": 5,
+  "seed": 1337,
+  "folds": [
+    "fold_0.json",
+    "fold_1.json",
+    "fold_2.json",
+    "fold_3.json",
+    "fold_4.json"
+  ]
+}

@@ -50,6 +50,7 @@ def main() -> None:
     parser.add_argument("--split-json", type=Path, default=ROOT / "data" / "manifests" / "split.json")
     parser.add_argument("--phoneme-vocab", type=Path, default=ROOT / "data" / "manifests" / "phoneme_vocab.json")
     parser.add_argument("--run-name", type=str, default="baseline_causal")
+    parser.add_argument("--init-checkpoint", type=Path, default=None)
     parser.add_argument("--epochs", type=int, default=25)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--lr", type=float, default=3e-4)
@@ -145,6 +146,10 @@ def main() -> None:
         num_attention_heads=args.num_attention_heads,
         num_gru_layers=args.num_gru_layers,
     ).to(device)
+    if args.init_checkpoint is not None:
+        init_checkpoint = torch.load(args.init_checkpoint, map_location=device, weights_only=False)
+        model.load_state_dict(init_checkpoint["model_state"], strict=False)
+        print(f"Initialized model from {args.init_checkpoint}")
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(args.epochs, 1))

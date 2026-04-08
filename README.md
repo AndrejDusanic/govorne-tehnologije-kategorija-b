@@ -19,28 +19,31 @@ Trenutno je implementiran i provjeren kompletan audio/text pipeline:
 
 ## Trenutni najbolji rezultat
 
-Najbolji setup koji je trenutno spreman u repou je ensemble ova dva checkpointa plus novi learned face refiner:
+Najbolji setup koji je trenutno spreman u repou je weighted ensemble ova dva checkpointa plus tuned learned face refiner:
 
 - `artifacts/checkpoints/baseline_full_v1/best.pt`
 - `artifacts/checkpoints/text_bgru_v1_cpu/best.pt`
-- `artifacts/refiners/text_ensemble_face_refiner_v1.npz`
+- tezine ensemble-a: `0.6 / 0.4`
+- `artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz`
 
 Ensemble rezultat na validation splitu:
 
-- Validation MAE: `0.0181840`
-- Validation RMSE: `0.0424416`
-- Mouth-only MAE: `0.0217098`
-- JawOpen MAE: `0.0238344`
+- Validation MAE: `0.0181320`
+- Validation RMSE: `0.0426877`
+- Mouth-only MAE: `0.0217408`
+- JawOpen MAE: `0.0239838`
 
-Najbolji pojedinacni checkpoint po MAE i dalje je `baseline_full_v1`, dok `text_bgru_v1_cpu` sluzi kao drugi clan ensemble-a. Taj model je istreniran nakon ispravke citanja transkripata iz Excel fajlova, pa sada koristi stvarni tekst umjesto rednih brojeva uzoraka. Novi face refiner se zatim primjenjuje nad ensemble izlazom i dodatno popravlja validacioni skor.
+Najbolji pojedinacni checkpoint po MAE i dalje je `baseline_full_v1`, dok `text_bgru_v1_cpu` sluzi kao drugi clan ensemble-a. Taj model je istreniran nakon ispravke citanja transkripata iz Excel fajlova, pa sada koristi stvarni tekst umjesto rednih brojeva uzoraka. Zavrsni dobitak je dosao iz weighted raw-space averaging-a (`0.6 / 0.4`) i dodatnog tuninga Ridge face refiner-a.
 
-Finalni local submission je regenerisan u `artifacts/predictions/final_test_submission/` sa `baseline_full_v1 + text_bgru_v1_cpu + text_ensemble_face_refiner_v1`. Avatar demo verzija sa reproducibilnim treptanjem je u `artifacts/predictions/final_test_avatar_ready/`.
+Finalni local submission je regenerisan u `artifacts/predictions/final_test_submission/` sa `baseline_full_v1 + text_bgru_v1_cpu + weighted averaging + text_ensemble_weighted_face_refiner_v1`. Avatar demo verzija sa reproducibilnim treptanjem je u `artifacts/predictions/final_test_avatar_ready/`.
 
 Najvazniji grafici su vec generisani:
 
 - `reports/figures/dataset_overview.png`
 - `reports/figures/blendshape_activity.png`
 - `reports/figures/phoneme_distribution.png`
+- `reports/figures/text_ensemble_weighted_refined/validation_per_blendshape_mae.png`
+- `reports/figures/text_ensemble_weighted_refined/ensemble_spk08_001_overlay.png`
 - `reports/figures/text_ensemble_refined_default/validation_per_blendshape_mae.png`
 - `reports/figures/text_ensemble_refined_default/ensemble_spk08_001_overlay.png`
 - `reports/figures/text_ensemble_default/validation_per_blendshape_mae.png`
@@ -72,6 +75,14 @@ Najvazniji grafici su vec generisani:
   - evaluacija nad validation splitom za jedan checkpoint ili ensemble, uz opcioni face refiner
 - `scripts/infer_folder.py`
   - inferenca nad folderom sa `.wav` fajlovima za jedan checkpoint ili ensemble, uz opcioni face refiner
+- `scripts/search_ensemble_weights.py`
+  - pretraga najboljih tezina za ensemble od dva checkpointa
+- `scripts/pseudo_label_synth.py`
+  - pseudo-labeling sintetizovanog audija i gradnja mjesovitog manifesta
+- `scripts/build_kfold_splits.py`
+  - generisanje speaker-balanced k-fold splitova nad prirodnim snimcima
+- `scripts/benchmark_backbones.py`
+  - brzo poredjenje mel vs `HuBERT` vs `WavLM` feature extraction troska
 - `scripts/postprocess_blinks.py`
   - dodaje reproducibilna nasumicna treptanja nad vec generisanim `CSV` fajlovima za avatar demo
 - `src/blendshape_project/face_refiner.py`
@@ -109,7 +120,7 @@ python scripts/analyze_data.py
 3. Najbrza provjera najboljeg spremnog setupa:
 
 ```powershell
-python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --face-refiner artifacts/refiners/text_ensemble_face_refiner_v1.npz --device cuda
+python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --device cuda --output-dir reports/figures/text_ensemble_weighted_refined
 ```
 
 4. Trening novog jaceg offline modela:
@@ -133,7 +144,7 @@ python scripts/evaluate.py --checkpoint artifacts/checkpoints/improved_full_run/
 6. Inferenca nad novim audio fajlovima sa najboljim spremnim ensemble-om:
 
 ```powershell
-python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --face-refiner artifacts/refiners/text_ensemble_face_refiner_v1.npz --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda
+python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda
 ```
 
 7. Inferenca nad novim audio fajlovima sa svojim novim runom:
@@ -145,7 +156,7 @@ python scripts/infer_folder.py --checkpoint artifacts/checkpoints/improved_full_
 8. Ako hoces da avatar povremeno trepce u demou, dodaj blink post-processing direktno u inferenci:
 
 ```powershell
-python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --face-refiner artifacts/refiners/text_ensemble_face_refiner_v1.npz --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda --random-blinks --blink-strength 1.0
+python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda --random-blinks --blink-strength 1.0
 ```
 
 9. Ako vec imas generisane `CSV` fajlove i samo hoces blink verziju za avatar:
@@ -251,7 +262,7 @@ Ako hoces rucno:
 Ako hoces samo evaluaciju vec istreniranog modela:
 
 ```bash
-!python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --face-refiner artifacts/refiners/text_ensemble_face_refiner_v1.npz --device cuda
+!python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --device cuda --output-dir reports/figures/text_ensemble_weighted_refined
 ```
 
 Ako hoces trening u Colabu:
@@ -263,12 +274,12 @@ Ako hoces trening u Colabu:
 Ako hoces inferencu nad test WAV folderom:
 
 ```bash
-!python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --face-refiner artifacts/refiners/text_ensemble_face_refiner_v1.npz --input-dir test_wavs --output-dir artifacts/predictions/colab_test --device cuda
+!python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --input-dir test_wavs --output-dir artifacts/predictions/colab_test --device cuda
 ```
 
 ## Model u jednoj recenici
 
-Novi default setup koristi log-mel + delta + delta-delta audio feature-e na `60 FPS`, speaker conditioning, stvarni text conditioning preko karakter-level attention grane u `text_bgru_v1_cpu`, bidirectional GRU temporal encoder, dodatni fonemski supervision, peak-aware loss za usne koeficijente i learned face refiner za jacu mimiku cijelog lica.
+Novi default setup koristi log-mel + delta + delta-delta audio feature-e na `60 FPS`, speaker conditioning, stvarni text conditioning preko karakter-level attention grane u `text_bgru_v1_cpu`, bidirectional GRU temporal encoder, dodatni fonemski supervision, peak-aware loss za usne koeficijente, weighted averaging `0.6 / 0.4` i learned face refiner za jacu mimiku cijelog lica.
 
 `scripts/evaluate.py` i `scripts/infer_folder.py` sada podrzavaju vise `--checkpoint` argumenata i rade raw-space averaging, a zatim opciono i face refinement, pa dobijes ensemble bez dodatnog koda.
 
@@ -307,5 +318,13 @@ Primjer:
 Komanda:
 
 ```powershell
-python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --face-refiner artifacts/refiners/text_ensemble_face_refiner_v1.npz --input-dir test_wavs --text-dir test_texts --output-dir artifacts/predictions/test_run --device cuda
+python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --input-dir test_wavs --text-dir test_texts --output-dir artifacts/predictions/test_run --device cuda
 ```
+
+## Eksperimenti iz zavrsnog prolaza
+
+- `weighted ensemble + tuned refiner` je donio novi najbolji validation `MAE` bez primjetnog rasta inference troska; finalni local submission sada ima prosjecni CPU `RTF ~ 0.03394`
+- `synth/domain adaptation` je isproban preko pseudo-labeling-a nad `audio_synth` i kratkog fine-tuning-a (`text_bgru_v1_synth_ft`), ali nije nadmasio finalni ensemble
+- `HuBERT` i `WavLM` su benchmarkovani skriptom `scripts/benchmark_backbones.py`; na ovoj masini su feature-i bili mnogo sporiji od mel feature-a, pa nisu usvojeni kao novi default
+- `k-fold` tooling je dodat, ali puni k-fold retraining nije pokrenut jer bi znacajno produzio eksperiment bez garancije da ce biti bolji od finalnog submit-ready setupa
+- pravi test transkripti i dalje nisu dostupni u `test_set_catB.zip`, pa inferenca nad tim folderom radi sa praznim tekstom; kad ti transkripti postoje, novi text-aware model ih moze direktno koristiti

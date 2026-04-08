@@ -22,7 +22,7 @@ Drugi model, `text_bgru_v1_cpu`, koristi bidirectional GRU temporalni encoder i 
 
 Trening koristi kombinaciju nekoliko loss komponenti. Glavna regresiona komponenta je Smooth L1 loss nad normalizovanim blendshape koeficijentima. Dodatno se koristi temporalni loss nad razlikama susjednih frejmova, da se poboljša stabilnost pokreta kroz vrijeme. Za usne i vilicu se koriste veće težine, jer su ti koeficijenti najvažniji za sinhronizaciju govora i najvidljiviji na avataru. Postoji i peak-aware loss koji preko lokalnog max-pooling-a dodatno naglašava vršne pokrete kod koeficijenata kao što su `jawOpen`, `mouthFunnel`, `mouthPucker`, `mouthClose`, `mouthSmile*` i `mouthLowerDown*`. Model takođe ima pomoćnu fonemsku glavu i cross-entropy loss za predikciju fonema po frejmu iz automatskih fonemskih poravnanja.
 
-Najbolji korišteni setup je ensemble dva checkpointa: `artifacts/checkpoints/baseline_full_v1/best.pt` i `artifacts/checkpoints/text_bgru_v1_cpu/best.pt`. Tokom evaluacije i inferencije oba modela generišu predikcije u raw blendshape prostoru, zatim se te predikcije prosječe. Nakon toga se primjenjuje learned face refiner `artifacts/refiners/text_ensemble_face_refiner_v1.npz`. Refiner je lagani Ridge regresioni model koji koristi trenutne vrijednosti, delta vrijednosti i kvadrate vrijednosti kao ulazne karakteristike, pa blago koriguje cijelo lice bez potpunog mijenjanja osnovne predikcije. Najbolja validaciona jačina novog refiner-a je `0.20`.
+Najbolji korišteni setup je weighted ensemble dva checkpointa: `artifacts/checkpoints/baseline_full_v1/best.pt` i `artifacts/checkpoints/text_bgru_v1_cpu/best.pt`. Tokom evaluacije i inferencije oba modela generišu predikcije u raw blendshape prostoru, zatim se kombinuju sa tezinama `0.6 / 0.4` u korist `baseline_full_v1`. Nakon toga se primjenjuje learned face refiner `artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz`. Refiner je lagani Ridge regresioni model koji koristi trenutne vrijednosti, delta vrijednosti i kvadrate vrijednosti kao ulazne karakteristike, pa blago koriguje cijelo lice bez potpunog mijenjanja osnovne predikcije. Najbolja validaciona jacina novog refiner-a je `0.15`.
 
 Za demo u avatar aplikaciji postoji i opcioni random blink post-processing. On dodaje reproducibilna treptanja u `eyeBlinkLeft/Right`, uz male korekcije `eyeSquint*`, `browDown*` i `eyeWide*`. Ovo je korisno za prirodniji vizuelni demo, ali ga ne treba tretirati kao osnovnu validacionu metriku, jer mijenja izlaz na heuristički način.
 
@@ -36,12 +36,12 @@ Najbolji pojedinačni checkpoint po MAE je i dalje `baseline_full_v1`, ali novi 
 | `hybrid_bgru_v1` | 0.020361 | 0.044822 | 0.024188 | 0.025973 | Stari BiGRU model, treniran prije ispravke transkripata |
 | `text_bgru_v1_cpu` | 0.019487 | 0.043423 | 0.023047 | 0.024975 | Novi BiGRU model sa stvarnim tekstom |
 | Stari ensemble + refiner | 0.018444 | 0.042886 | 0.022274 | 0.024384 | Prethodni najbolji setup |
-| Novi ensemble bez refiner-a | 0.018255 | 0.042689 | 0.021820 | 0.023877 | `baseline_full_v1 + text_bgru_v1_cpu` |
-| Novi ensemble + face refiner | 0.018184 | 0.042442 | 0.021710 | 0.023834 | Najbolji trenutni setup |
+| Weighted ensemble bez refiner-a | 0.018223 | 0.042933 | 0.021858 | 0.024047 | `baseline_full_v1 + text_bgru_v1_cpu`, tezine `0.6 / 0.4` |
+| Weighted ensemble + tuned face refiner | 0.018132 | 0.042688 | 0.021741 | 0.023984 | Najbolji trenutni setup po MAE |
 
-Najveće greške po blendshape koeficijentima ostaju na izrazito dinamičnim usnenim pokretima: `mouthLowerDownLeft/Right`, `mouthFunnel`, `mouthPucker`, `mouthSmileLeft/Right` i dijelom `mouthUpperUp*`. To je očekivano jer su ovi koeficijenti najviše zavisni od precizne fonetske i vremenske sinhronizacije. Refiner blago popravlja MAE i RMSE, ali nije dramatičan skok; njegov veći doprinos je vizuelno jačanje gornjeg dijela lica i stabilnija full-face mimika.
+Najveće greške po blendshape koeficijentima ostaju na izrazito dinamičnim usnenim pokretima: `mouthLowerDownLeft/Right`, `mouthFunnel`, `mouthPucker`, `mouthSmileLeft/Right` i dijelom `mouthUpperUp*`. To je očekivano jer su ovi koeficijenti najviše zavisni od precizne fonetske i vremenske sinhronizacije. Refiner blago popravlja MAE, ali nije dramatičan skok; njegov veći doprinos je vizuelno jačanje gornjeg dijela lica i stabilnija full-face mimika. U zavrsnom prolazu dodatno su isprobani synth pseudo-labeling, benchmark `HuBERT/WavLM` feature-a i k-fold tooling. Pseudo-labeling je malo popravio samostalni text model, ali nije dao bolji finalni ensemble. `HuBERT/WavLM` su se pokazali znatno sporijim od log-mel feature-a na ovoj masini, pa nisu usvojeni kao novi default. K-fold skripte su pripremljene, ali puni k-fold retraining nije pokrenut jer bi znatno produzio eksperiment.
 
-Finalni submit folder `artifacts/predictions/final_test_submission/` regenerisan je novim najboljim setupom i sadrži 13 `.csv` fajlova. Provjereno je da svaki `.csv` ima 52 vrijednosti po redu i da nema header. U `meta.json` su upisani `fps_out = 60`, `lookahead_ms = 6609`, `inference_time_sec` i `rtf` po test fajlu. Skripta za inferenciju sada radi jedan warm-up prije mjerenja i mjeri i pripremu ulaza po fajlu. Prosječni RTF u lokalnom CPU mjerenju za official folder je oko `0.0338`; avatar-ready verzija sa random blink postprocessingom je u `artifacts/predictions/final_test_avatar_ready/` i ima prosječni RTF oko `0.0369`.
+Finalni submit folder `artifacts/predictions/final_test_submission/` regenerisan je novim najboljim setupom i sadrži 13 `.csv` fajlova. Provjereno je da svaki `.csv` ima 52 vrijednosti po redu i da nema header. U `meta.json` su upisani `fps_out = 60`, `lookahead_ms = 6609`, `inference_time_sec`, `rtf` i tezine ensemble-a. Skripta za inferenciju sada radi jedan warm-up prije mjerenja i mjeri i pripremu ulaza po fajlu. Prosječni RTF u lokalnom CPU mjerenju za official folder je oko `0.03394`; avatar-ready verzija sa random blink postprocessingom je u `artifacts/predictions/final_test_avatar_ready/`.
 
 ## 5. Uputstvo za pokretanje
 
@@ -61,7 +61,7 @@ python scripts/analyze_data.py
 Evaluacija najboljeg postojećeg setupa:
 
 ```powershell
-python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --face-refiner artifacts/refiners/text_ensemble_face_refiner_v1.npz --device cuda --output-dir reports/figures/text_ensemble_refined_default
+python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --device cuda --output-dir reports/figures/text_ensemble_weighted_refined
 ```
 
 Trening novog offline BiGRU modela:
@@ -79,13 +79,13 @@ python scripts/train.py --run-name causal_run --epochs 18 --batch-size 8 --devic
 Inferencija nad folderom sa novim audio fajlovima:
 
 ```powershell
-python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --face-refiner artifacts/refiners/text_ensemble_face_refiner_v1.npz --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda
+python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda
 ```
 
 Za avatar demo se može dodati treptanje:
 
 ```powershell
-python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --face-refiner artifacts/refiners/text_ensemble_face_refiner_v1.npz --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda --random-blinks --blink-strength 1.0
+python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda --random-blinks --blink-strength 1.0
 ```
 
 U Colab okruženju se može koristiti notebook `notebooks/competition_pipeline_colab.ipynb` ili bootstrap skripta:
@@ -98,7 +98,7 @@ bash scripts/colab_bootstrap.sh --with-analysis
 
 Za trening se preporučuje NVIDIA GPU u Google Colab okruženju ili lokalna CUDA mašina. `baseline_full_v1` je treniran 18 epoha i u checkpoint konfiguraciji je zabilježen `device = cuda`. Novi `text_bgru_v1_cpu` je u završnom prolazu istreniran 18 epoha na ovoj CPU mašini sa 12 logičkih jezgara, jer CUDA nije bila dostupna; run je trajao približno 33 minute. Iako je CPU bio dovoljan za ovaj skup, za ponovljive eksperimente i brže iteracije i dalje je preporučen Colab GPU.
 
-Tačno vrijeme obuke za starije checkpoint-e nije logovano, pa ga ne treba prikazivati kao izmjerenu vrijednost. Za novi text-aware BiGRU postoji lokalna CPU mjera od oko 33 minute. Razumna procjena za ponovno treniranje na Colab GPU-u je red veličine nekoliko do nekoliko desetina minuta za postojeći skup i navedene konfiguracije, uz zavisnost od dostupnog GPU-a, opterećenja Colab runtime-a i broja epoha.
+Tačno vrijeme obuke za starije checkpoint-e nije logovano, pa ga ne treba prikazivati kao izmjerenu vrijednost. Za novi text-aware BiGRU postoji lokalna CPU mjera od oko 33 minute. Razumna procjena za ponovno treniranje na Colab GPU-u je red veličine nekoliko do nekoliko desetina minuta za postojeći skup i navedene konfiguracije, uz zavisnost od dostupnog GPU-a, opterećenja Colab runtime-a i broja epoha. Zavrsni weighted ensemble i tuned refiner ne mijenjaju znacajno inference trosak u odnosu na raniji equal-weight setup, jer koriste iste checkpoint-e i isti tip refiner-a.
 
 Važno je razlikovati dva režima rada. Best-quality offline režim koristi ensemble sa BiGRU modelom i face refiner-om; on daje najbolju validacionu metriku, ali koristi budući kontekst. Strict real-time režim treba bazirati na kauzalnom TCN modelu, jer taj model može raditi sa `lookahead_ms = 0`, uz nešto slabiji kvalitet.
 
@@ -106,6 +106,6 @@ Važno je razlikovati dva režima rada. Best-quality offline režim koristi ense
 
 Najvažniji prethodno uočeni problem, čitanje transkripata iz pogrešne Excel kolone, sada je ispravljen. Sljedeći konkretan korak je obezbijediti stvarne tekstualne transkripte i za test fajlove kad god su dostupni, jer sada model može koristiti tekst na smislen način. Za test ZIP prisutan u ovom folderu transkripti nisu bili dostupni, pa je local submission generisan sa praznim tekstom.
 
-Drugi korak je domain adaptation na sintetizovanom govoru. Pošto test faza može sadržati audio dobijen sintezom govora, korisno je iskoristiti `audio_synth` za pseudo-labeling, teacher-student trening ili DTW poravnanje sa prirodnim snimcima istog tekstualnog sadržaja. Treći mogući pravac je korištenje jačeg speech backbone-a, npr. HuBERT ili WavLM, ali to povećava memorijske i vremenske zahtjeve. Za stabilniju procjenu prije finalnog treninga korisno je uvesti k-fold validaciju i posebno mjeriti rezultate po govorniku i po grupama blendshape koeficijenata.
+Drugi korak je domain adaptation na sintetizovanom govoru. U ovom prolazu je vec isproban pseudo-labeling nad `audio_synth` i kratki fine-tuning text modela, ali ta varijanta nije nadmasila finalni weighted ensemble. I dalje je smisleno nastaviti teacher-student ili DTW pristup ako bude vremena za duze treninge. Treći mogući pravac je korištenje jačeg speech backbone-a, npr. HuBERT ili WavLM, ali to povećava memorijske i vremenske zahtjeve; brzi benchmark u ovom repou je pokazao da su ovi backbone-i znatno sporiji od log-mel feature-a. Za stabilniju procjenu prije eventualnog finalnog retraining-a korisno je uvesti puni k-fold trening i posebno mjeriti rezultate po govorniku i po grupama blendshape koeficijenata.
 
 Za mjerljiviji RTF treba dodati warm-up prije mjerenja prvog fajla ili posebno prijaviti prvi fajl kao cold-start. Za produkcijski real-time demo preporučuje se održavati odvojenu kauzalnu konfiguraciju, dok se ensemble + BiGRU koristi kao offline best-quality submission kada je primarni kriterijum prirodnost animacije.

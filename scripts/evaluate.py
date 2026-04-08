@@ -30,10 +30,23 @@ def select_device(requested: str) -> torch.device:
     return torch.device(requested)
 
 
+def parse_ensemble_weights(raw: str | None, ensemble_size: int) -> list[float]:
+    if raw is None:
+        return [1.0 / ensemble_size] * ensemble_size
+    weights = [float(item.strip()) for item in raw.split(",") if item.strip()]
+    if len(weights) != ensemble_size:
+        raise ValueError(f"Expected {ensemble_size} ensemble weights, got {len(weights)}.")
+    total = sum(weights)
+    if total <= 0:
+        raise ValueError("Ensemble weights must sum to a positive value.")
+    return [weight / total for weight in weights]
+
+
 def evaluate_bundles(
     bundles: list,
     loaders: list[DataLoader],
     device: torch.device,
+    ensemble_weights: list[float],
     face_refiner=None,
     face_refiner_strength: float | None = None,
 ) -> dict[str, object]:
@@ -69,7 +82,12 @@ def evaluate_bundles(
                 )
                 predictions_raw.append(prediction)
 
-            ensemble_prediction = torch.stack(predictions_raw, dim=0).mean(dim=0)
+            weight_tensor = torch.tensor(
+                ensemble_weights,
+                device=device,
+                dtype=predictions_raw[0].dtype,
+            ).view(-1, 1, 1, 1)
+            ensemble_prediction = (torch.stack(predictions_raw, dim=0) * weight_tensor).sum(dim=0)
             if face_refiner is not None:
                 ensemble_prediction = apply_face_refiner(
                     ensemble_prediction,
@@ -123,6 +141,7 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, default=ROOT / "data" / "manifests" / "natural_samples.csv")
     parser.add_argument("--split-json", type=Path, default=ROOT / "data" / "manifests" / "split.json")
     parser.add_argument("--output-dir", type=Path, default=ROOT / "reports" / "figures")
+    parser.add_argument("--ensemble-weights", type=str, default=None)
     parser.add_argument("--face-refiner", type=Path, default=None)
     parser.add_argument("--face-refiner-strength", type=float, default=None)
     parser.add_argument("--device", type=str, default="auto")
@@ -131,6 +150,7 @@ def main() -> None:
     device = select_device(args.device)
     feature_extractor = AudioFeatureExtractor()
     bundles = [load_model_bundle(checkpoint, device=device, feature_dim=feature_extractor.feature_dim) for checkpoint in args.checkpoint]
+    ensemble_weights = parse_ensemble_weights(args.ensemble_weights, len(bundles))
     face_refiner = load_face_refiner(args.face_refiner, device=device) if args.face_refiner is not None else None
 
     frame = pd.read_csv(args.manifest)
@@ -153,6 +173,7 @@ def main() -> None:
         bundles,
         loaders,
         device,
+        ensemble_weights=ensemble_weights,
         face_refiner=face_refiner,
         face_refiner_strength=args.face_refiner_strength,
     )
@@ -164,6 +185,7 @@ def main() -> None:
             "samples": [],
             "checkpoints": [str(bundle.checkpoint_path) for bundle in bundles],
             "ensemble_size": len(bundles),
+            "ensemble_weights": ensemble_weights,
             "face_refiner": str(args.face_refiner) if args.face_refiner is not None else None,
             "face_refiner_strength": (
                 args.face_refiner_strength

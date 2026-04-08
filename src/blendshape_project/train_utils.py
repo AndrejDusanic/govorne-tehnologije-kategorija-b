@@ -33,12 +33,18 @@ def compute_losses(
     targets = batch["targets"]
     mask = batch["target_mask"].unsqueeze(-1).float()
     target_activity = batch["target_activity"].to(predictions.device)
+    sample_weights = batch.get("sample_weights")
+    if sample_weights is None:
+        sample_weights = torch.ones(predictions.shape[0], device=predictions.device, dtype=predictions.dtype)
+    else:
+        sample_weights = sample_weights.to(device=predictions.device, dtype=predictions.dtype)
+    sample_weights = sample_weights.view(-1, 1, 1)
     coeffs = coefficient_weights
     if coeffs is None:
         coeffs = torch.tensor(blendshape_priority_weights(), device=predictions.device, dtype=predictions.dtype)
     coeffs = coeffs.view(1, 1, -1)
     activity_weights = 1.0 + activity_loss_weight * target_activity.pow(activity_gamma)
-    combined_weights = coeffs * activity_weights * mask
+    combined_weights = coeffs * activity_weights * mask * sample_weights
 
     reg_residual = F.smooth_l1_loss(predictions, targets, reduction="none") * combined_weights
     reg_denom = combined_weights.sum().clamp_min(1.0)
@@ -49,7 +55,7 @@ def compute_losses(
         delta_target = targets[:, 1:] - targets[:, :-1]
         delta_mask = (batch["target_mask"][:, 1:] & batch["target_mask"][:, :-1]).unsqueeze(-1).float()
         delta_activity = torch.maximum(target_activity[:, 1:], target_activity[:, :-1])
-        delta_weights = coeffs * (1.0 + activity_loss_weight * delta_activity.pow(activity_gamma)) * delta_mask
+        delta_weights = coeffs * (1.0 + activity_loss_weight * delta_activity.pow(activity_gamma)) * delta_mask * sample_weights
         temporal_residual = F.smooth_l1_loss(delta_pred, delta_target, reduction="none") * delta_weights
         temporal_denom = delta_weights.sum().clamp_min(1.0)
         temporal_loss = temporal_residual.sum() / temporal_denom
@@ -64,7 +70,7 @@ def compute_losses(
         focus_mask = batch["target_mask"].unsqueeze(-1).float().expand(-1, -1, len(focus_indices)).transpose(1, 2)
         pooled_pred = F.max_pool1d(focus_pred, kernel_size=7, stride=1, padding=3)
         pooled_target = F.max_pool1d(focus_target, kernel_size=7, stride=1, padding=3)
-        peak_weights = (1.0 + activity_loss_weight * focus_activity.pow(activity_gamma)) * focus_mask
+        peak_weights = (1.0 + activity_loss_weight * focus_activity.pow(activity_gamma)) * focus_mask * sample_weights.transpose(1, 2)
         peak_residual = F.smooth_l1_loss(pooled_pred, pooled_target, reduction="none") * peak_weights
         peak_loss = peak_residual.sum() / peak_weights.sum().clamp_min(1.0)
     else:
@@ -72,7 +78,11 @@ def compute_losses(
 
     phoneme_logits = outputs["phonemes"].reshape(-1, outputs["phonemes"].shape[-1])
     phoneme_targets = batch["phoneme_ids"].reshape(-1)
-    phoneme_loss = F.cross_entropy(phoneme_logits, phoneme_targets, ignore_index=-100)
+    valid_phoneme_mask = phoneme_targets.ne(-100)
+    if valid_phoneme_mask.any():
+        phoneme_loss = F.cross_entropy(phoneme_logits[valid_phoneme_mask], phoneme_targets[valid_phoneme_mask])
+    else:
+        phoneme_loss = predictions.new_tensor(0.0)
 
     total_loss = regression_loss + temporal_loss_weight * temporal_loss + phoneme_loss_weight * phoneme_loss + peak_loss_weight * peak_loss
     return {

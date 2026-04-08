@@ -1,0 +1,28 @@
+{
+  "device": "cpu",
+  "mel": {
+    "avg_time_sec": 0.01850863333675079,
+    "avg_duration_sec": 21.35898715041572,
+    "avg_rtf": 0.000866550141465418,
+    "feature_dim": 240,
+    "n_files": 3
+  },
+  "hubert_base": {
+    "bundle": "HUBERT_BASE",
+    "sample_rate": 16000,
+    "avg_time_sec": 2.6421552000004644,
+    "avg_duration_sec": 21.359020833333332,
+    "avg_rtf": 0.12370207513806354,
+    "feature_dim": 768,
+    "n_files": 3
+  },
+  "wavlm_base": {
+    "bundle": "WAVLM_BASE",
+    "sample_rate": 16000,
+    "avg_time_sec": 2.803169433337947,
+    "avg_duration_sec": 21.359020833333332,
+    "avg_rtf": 0.13124054024814014,
+    "feature_dim": 768,
+    "n_files": 3
+  }
+}

@@ -33,9 +33,22 @@ def select_device(requested: str) -> torch.device:
     return torch.device(requested)
 
 
+def parse_ensemble_weights(raw: str | None, ensemble_size: int) -> list[float]:
+    if raw is None:
+        return [1.0 / ensemble_size] * ensemble_size
+    weights = [float(item.strip()) for item in raw.split(",") if item.strip()]
+    if len(weights) != ensemble_size:
+        raise ValueError(f"Expected {ensemble_size} ensemble weights, got {len(weights)}.")
+    total = sum(weights)
+    if total <= 0:
+        raise ValueError("Ensemble weights must sum to a positive value.")
+    return [weight / total for weight in weights]
+
+
 def collect_predictions(
     frame: pd.DataFrame,
     bundles: list,
+    ensemble_weights: list[float],
     feature_extractor: AudioFeatureExtractor,
     device: torch.device,
     batch_size: int = 4,
@@ -54,6 +67,7 @@ def collect_predictions(
 
     features_list: list[np.ndarray] = []
     targets_list: list[np.ndarray] = []
+    weight_tensor = torch.tensor(ensemble_weights, device=device, dtype=torch.float32).view(-1, 1, 1, 1)
     with torch.no_grad():
         for batches in tqdm(zip(*loaders), total=len(loaders[0]), desc="Collecting predictions", leave=False):
             predictions = []
@@ -68,7 +82,7 @@ def collect_predictions(
                 )
                 predictions.append(prediction)
 
-            ensemble_prediction = torch.stack(predictions, dim=0).mean(dim=0)
+            ensemble_prediction = (torch.stack(predictions, dim=0) * weight_tensor).sum(dim=0)
             refiner_features = build_face_refiner_features(ensemble_prediction).cpu().numpy()
             targets = batches[0]["targets"].cpu().numpy()
             mask = batches[0]["target_mask"].cpu().numpy()
@@ -105,7 +119,9 @@ def main() -> None:
     parser.add_argument("--split-json", type=Path, default=ROOT / "data" / "manifests" / "split.json")
     parser.add_argument("--output", type=Path, default=ROOT / "artifacts" / "refiners" / "ensemble_face_refiner_v1.npz")
     parser.add_argument("--metrics-json", type=Path, default=ROOT / "artifacts" / "refiners" / "ensemble_face_refiner_v1_metrics.json")
+    parser.add_argument("--ensemble-weights", type=str, default=None)
     parser.add_argument("--ridge-alpha", type=float, default=1.0)
+    parser.add_argument("--ridge-alpha-grid", type=str, default=None)
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--strength-grid", type=str, default="0.20,0.25,0.30,0.35,0.40,0.45,0.50")
@@ -114,56 +130,102 @@ def main() -> None:
     device = select_device(args.device)
     feature_extractor = AudioFeatureExtractor()
     bundles = [load_model_bundle(checkpoint, device=device, feature_dim=feature_extractor.feature_dim) for checkpoint in args.checkpoint]
+    ensemble_weights = parse_ensemble_weights(args.ensemble_weights, len(bundles))
 
     frame = pd.read_csv(args.manifest)
     split = load_json(args.split_json)
     train_df = frame[frame["sample_id"].isin(split["train"])].copy()
     val_df = frame[frame["sample_id"].isin(split["val"])].copy()
 
-    train_x, train_y = collect_predictions(train_df, bundles, feature_extractor, device=device, batch_size=args.batch_size)
-    val_x, val_y = collect_predictions(val_df, bundles, feature_extractor, device=device, batch_size=args.batch_size)
+    train_x, train_y = collect_predictions(
+        train_df,
+        bundles,
+        ensemble_weights=ensemble_weights,
+        feature_extractor=feature_extractor,
+        device=device,
+        batch_size=args.batch_size,
+    )
+    val_x, val_y = collect_predictions(
+        val_df,
+        bundles,
+        ensemble_weights=ensemble_weights,
+        feature_extractor=feature_extractor,
+        device=device,
+        batch_size=args.batch_size,
+    )
 
-    model = Ridge(alpha=args.ridge_alpha, fit_intercept=True)
-    model.fit(train_x, train_y)
-
+    alpha_grid = (
+        [float(item.strip()) for item in args.ridge_alpha_grid.split(",") if item.strip()]
+        if args.ridge_alpha_grid
+        else [args.ridge_alpha]
+    )
+    grid = [float(item.strip()) for item in args.strength_grid.split(",") if item.strip()]
     feature_dim = len(BLENDSHAPE_NAMES)
     base_val = val_x[:, :feature_dim]
-    refined_val = np.clip(model.predict(val_x), 0.0, 1.0)
 
-    grid = [float(item.strip()) for item in args.strength_grid.split(",") if item.strip()]
-    strength_logs = []
+    best_alpha = alpha_grid[0]
     best_strength = grid[0]
     best_metrics = None
     best_mae = float("inf")
-    for strength in grid:
-        metrics = evaluate_strength(base_val, refined_val, val_y, strength)
-        strength_logs.append({"strength": strength, **metrics})
-        if metrics["mae"] < best_mae:
-            best_mae = metrics["mae"]
-            best_strength = strength
-            best_metrics = metrics
+    best_model = None
+    best_strength_logs = []
+    alpha_logs = []
+    for alpha in alpha_grid:
+        model = Ridge(alpha=alpha, fit_intercept=True)
+        model.fit(train_x, train_y)
+        refined_val = np.clip(model.predict(val_x), 0.0, 1.0)
+        strength_logs = []
+        alpha_best_metrics = None
+        alpha_best_strength = grid[0]
+        alpha_best_mae = float("inf")
+        for strength in grid:
+            metrics = evaluate_strength(base_val, refined_val, val_y, strength)
+            strength_logs.append({"strength": strength, **metrics})
+            if metrics["mae"] < alpha_best_mae:
+                alpha_best_mae = metrics["mae"]
+                alpha_best_strength = strength
+                alpha_best_metrics = metrics
+        alpha_logs.append(
+            {
+                "ridge_alpha": alpha,
+                "best_strength": alpha_best_strength,
+                "best_metrics": alpha_best_metrics,
+                "strength_grid": strength_logs,
+            }
+        )
+        if alpha_best_mae < best_mae:
+            best_mae = alpha_best_mae
+            best_alpha = alpha
+            best_strength = alpha_best_strength
+            best_metrics = alpha_best_metrics
+            best_model = model
+            best_strength_logs = strength_logs
 
     save_face_refiner(
         args.output,
-        coefficients=model.coef_,
-        intercept=model.intercept_,
+        coefficients=best_model.coef_,
+        intercept=best_model.intercept_,
         feature_mode="current_delta_square",
         default_strength=best_strength,
         metadata={
-            "ridge_alpha": args.ridge_alpha,
+            "ridge_alpha": best_alpha,
             "source_checkpoints": [str(path) for path in args.checkpoint],
+            "ensemble_weights": ensemble_weights,
             "feature_dim": feature_dim,
             "tuned_on": "validation_split",
         },
     )
 
     payload = {
+        "best_ridge_alpha": best_alpha,
         "best_strength": best_strength,
         "best_metrics": best_metrics,
-        "base_metrics": evaluate_strength(base_val, refined_val, val_y, 0.0),
-        "fully_refined_metrics": evaluate_strength(base_val, refined_val, val_y, 1.0),
-        "strength_grid": strength_logs,
+        "base_metrics": evaluate_strength(base_val, np.clip(best_model.predict(val_x), 0.0, 1.0), val_y, 0.0),
+        "fully_refined_metrics": evaluate_strength(base_val, np.clip(best_model.predict(val_x), 0.0, 1.0), val_y, 1.0),
+        "strength_grid": best_strength_logs,
+        "alpha_grid": alpha_logs,
         "source_checkpoints": [str(path) for path in args.checkpoint],
+        "ensemble_weights": ensemble_weights,
     }
     save_json(args.metrics_json, payload)
     print(json.dumps(payload["best_metrics"] | {"best_strength": best_strength}, indent=2))

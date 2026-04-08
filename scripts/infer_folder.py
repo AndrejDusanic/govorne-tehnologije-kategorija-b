@@ -36,6 +36,18 @@ def synchronize_if_needed(device: torch.device) -> None:
         torch.cuda.synchronize(device)
 
 
+def parse_ensemble_weights(raw: str | None, ensemble_size: int) -> list[float]:
+    if raw is None:
+        return [1.0 / ensemble_size] * ensemble_size
+    weights = [float(item.strip()) for item in raw.split(",") if item.strip()]
+    if len(weights) != ensemble_size:
+        raise ValueError(f"Expected {ensemble_size} ensemble weights, got {len(weights)}.")
+    total = sum(weights)
+    if total <= 0:
+        raise ValueError("Ensemble weights must sum to a positive value.")
+    return [weight / total for weight in weights]
+
+
 def infer_speaker_id(filename: str, speaker_to_id: dict[str, int], default_speaker: str) -> int:
     prefix = filename.split("_")[0]
     if prefix in speaker_to_id:
@@ -58,6 +70,7 @@ def main() -> None:
     parser.add_argument("--input-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, default=ROOT / "artifacts" / "predictions")
     parser.add_argument("--device", type=str, default="auto")
+    parser.add_argument("--ensemble-weights", type=str, default=None)
     parser.add_argument("--default-speaker", type=str, choices=SPEAKER_ORDER, default="spk08")
     parser.add_argument("--text-dir", type=Path, default=None)
     parser.add_argument("--default-text", type=str, default="")
@@ -73,6 +86,8 @@ def main() -> None:
     device = select_device(args.device)
     feature_extractor = AudioFeatureExtractor(fps=args.fps)
     bundles = [load_model_bundle(checkpoint, device=device, feature_dim=feature_extractor.feature_dim) for checkpoint in args.checkpoint]
+    ensemble_weights = parse_ensemble_weights(args.ensemble_weights, len(bundles))
+    ensemble_weight_tensor = torch.tensor(ensemble_weights, dtype=torch.float32, device=device).view(-1, 1, 1)
     face_refiner = load_face_refiner(args.face_refiner, device=device) if args.face_refiner is not None else None
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -86,6 +101,7 @@ def main() -> None:
             "lookahead_ms": 0,
             "fps_out": args.fps,
             "ensemble_size": len(bundles),
+            "ensemble_weights": ensemble_weights,
             "checkpoints": [f"{bundle.checkpoint_path.parent.name}/{bundle.checkpoint_path.name}" for bundle in bundles],
             "face_refiner": str(args.face_refiner) if args.face_refiner is not None else None,
             "face_refiner_strength": (
@@ -129,7 +145,7 @@ def main() -> None:
                         text_lengths=dummy_text_lengths,
                     )
                 )
-            dummy_prediction = torch.stack(dummy_predictions, dim=0).mean(dim=0)
+            dummy_prediction = (torch.stack(dummy_predictions, dim=0) * ensemble_weight_tensor.unsqueeze(-1)).sum(dim=0)
             if face_refiner is not None:
                 apply_face_refiner(
                     dummy_prediction,
@@ -164,7 +180,7 @@ def main() -> None:
                 )
                 raw_predictions.append(prediction.squeeze(0))
 
-            prediction = torch.stack(raw_predictions, dim=0).mean(dim=0).unsqueeze(0)
+            prediction = (torch.stack(raw_predictions, dim=0) * ensemble_weight_tensor).sum(dim=0).unsqueeze(0)
             if face_refiner is not None:
                 prediction = apply_face_refiner(
                     prediction,
