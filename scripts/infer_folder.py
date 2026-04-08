@@ -31,6 +31,11 @@ def select_device(requested: str) -> torch.device:
     return torch.device(requested)
 
 
+def synchronize_if_needed(device: torch.device) -> None:
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+
+
 def infer_speaker_id(filename: str, speaker_to_id: dict[str, int], default_speaker: str) -> int:
     prefix = filename.split("_")[0]
     if prefix in speaker_to_id:
@@ -62,6 +67,7 @@ def main() -> None:
     parser.add_argument("--blink-strength", type=float, default=1.0)
     parser.add_argument("--blink-seed", type=int, default=1337)
     parser.add_argument("--fps", type=int, default=DEFAULT_FPS)
+    parser.add_argument("--warmup-runs", type=int, default=1)
     args = parser.parse_args()
 
     device = select_device(args.device)
@@ -90,20 +96,58 @@ def main() -> None:
             "random_blinks": args.random_blinks,
             "blink_strength": args.blink_strength if args.random_blinks else None,
             "blink_seed": args.blink_seed if args.random_blinks else None,
+            "warmup_runs": max(args.warmup_runs, 0),
         },
         "files": {},
     }
     max_duration_sec = 0.0
 
     with torch.no_grad():
+        for _ in range(max(args.warmup_runs, 0)):
+            dummy_frames = max(1, args.fps)
+            dummy_features = torch.zeros(
+                1,
+                dummy_frames,
+                feature_extractor.feature_dim,
+                dtype=torch.float32,
+                device=device,
+            )
+            dummy_lengths = torch.tensor([dummy_frames], dtype=torch.long, device=device)
+            dummy_predictions = []
+            for bundle in bundles:
+                dummy_speaker_id = bundle.speaker_to_id[args.default_speaker]
+                dummy_speaker_ids = torch.tensor([dummy_speaker_id], dtype=torch.long, device=device)
+                dummy_text_ids = text_to_char_ids(args.default_text, bundle.char_vocab).unsqueeze(0).to(device)
+                dummy_text_lengths = torch.tensor([dummy_text_ids.shape[1]], dtype=torch.long, device=device)
+                dummy_predictions.append(
+                    predict_raw_blendshapes(
+                        bundle,
+                        features=dummy_features,
+                        speaker_ids=dummy_speaker_ids,
+                        lengths=dummy_lengths,
+                        text_ids=dummy_text_ids,
+                        text_lengths=dummy_text_lengths,
+                    )
+                )
+            dummy_prediction = torch.stack(dummy_predictions, dim=0).mean(dim=0)
+            if face_refiner is not None:
+                apply_face_refiner(
+                    dummy_prediction,
+                    face_refiner,
+                    strength=args.face_refiner_strength,
+                    clamp=True,
+                )
+            synchronize_if_needed(device)
+
         for wav_path in audio_paths:
+            synchronize_if_needed(device)
+            start_time = time.perf_counter()
             waveform = load_waveform(wav_path, feature_extractor.sample_rate)
             target_frames = max(1, int(round(waveform.shape[-1] / feature_extractor.sample_rate * args.fps)))
             raw_features = feature_extractor(waveform, target_frames=target_frames).float().to(device)
             lengths = torch.tensor([target_frames], dtype=torch.long, device=device)
             text = read_text_for_audio(wav_path, args.text_dir, args.default_text)
 
-            start_time = time.perf_counter()
             raw_predictions = []
             for bundle in bundles:
                 speaker_id = infer_speaker_id(wav_path.stem, bundle.speaker_to_id, args.default_speaker)
@@ -119,7 +163,6 @@ def main() -> None:
                     text_lengths=text_lengths,
                 )
                 raw_predictions.append(prediction.squeeze(0))
-            elapsed = time.perf_counter() - start_time
 
             prediction = torch.stack(raw_predictions, dim=0).mean(dim=0).unsqueeze(0)
             if face_refiner is not None:
@@ -129,6 +172,7 @@ def main() -> None:
                     strength=args.face_refiner_strength,
                     clamp=True,
                 )
+            synchronize_if_needed(device)
             prediction = prediction.squeeze(0).cpu().numpy()
             blink_info = None
             if args.random_blinks:
@@ -143,6 +187,7 @@ def main() -> None:
             prediction = np.clip(prediction, 0.0, 1.0)
             output_csv = args.output_dir / f"{wav_path.stem}.csv"
             write_blendshape_csv(output_csv, prediction)
+            elapsed = time.perf_counter() - start_time
 
             duration_sec = waveform.shape[-1] / feature_extractor.sample_rate
             max_duration_sec = max(max_duration_sec, duration_sec)

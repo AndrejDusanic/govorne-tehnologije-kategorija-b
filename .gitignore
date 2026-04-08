@@ -27,3 +27,4 @@ artifacts/checkpoints/improved_smoke/
 reports/figures/compat_eval/
 reports/figures/single_baseline_check/
 test_set_catB.zip
+~$*.docx

@@ -59,9 +59,15 @@ def sample_number_from_name(path_like: str | Path) -> int:
 def read_transcripts_xlsx(path: Path) -> dict[int, str]:
     dataframe = pd.read_excel(path, header=None, engine="openpyxl")
     transcripts: dict[int, str] = {}
-    for idx, value in enumerate(dataframe.iloc[:, 0].tolist(), start=1):
-        text = "" if pd.isna(value) else str(value).strip()
-        transcripts[idx] = text
+    if dataframe.shape[1] >= 2:
+        for _, row in dataframe.iterrows():
+            sample_number = int(row.iloc[0])
+            text_value = row.iloc[1]
+            transcripts[sample_number] = "" if pd.isna(text_value) else str(text_value).strip()
+        return transcripts
+
+    for idx, text_value in enumerate(dataframe.iloc[:, 0].tolist(), start=1):
+        transcripts[idx] = "" if pd.isna(text_value) else str(text_value).strip()
     return transcripts
 
 
