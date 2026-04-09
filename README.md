@@ -1,7 +1,5 @@
 # Kategorija B: ARKit-52 Blendshape Prediction
 
-Ovaj folder je pretvoren u kompletan takmicarski projekat za zadatak iz `kategorijaB_baza (2).pdf`: iz teksta i/ili audija predvidjeti ARKit-52 blendshape sekvencu pogodnu za avatar i real-time rad.
-
 Trenutno je implementiran i provjeren kompletan audio/text pipeline:
 
 - raspakivanje i organizacija podataka
@@ -9,17 +7,17 @@ Trenutno je implementiran i provjeren kompletan audio/text pipeline:
 - EDA grafikoni nad bazom
 - hibridni audio+text model sa speaker embedding-om
 - bidirectional temporal encoder za kvalitetniji offline mod
-- multitask trening sa pomocnim fonemskim loss-om
-- activity/peak weighted loss za teze usne blendshape-ove
-- learned face refiner koji pojacava podaktivne brow/eye/nose koeficijente bez rusenja stabilnosti
+- multitask trening sa pomoćnim fonemskim loss-om
+- activity/peak weighted loss za teže usne blendshape-ove
+- learned face refiner koji pojacava podaktivne brow/eye/nose koeficijente bez rušenja stabilnosti
 - evaluacija sa grafikonima
 - inferenca koja generise `CSV` i `meta.json`
 - Colab notebook za pokretanje svega iz Git repozitorija
-- izvjestaj za predaju u `reports/izvjestaj_kategorija_b.md` i `reports/izvjestaj_kategorija_b.docx`
+- izvještaj za predaju u `reports/izvjestaj_kategorija_b.md` i `reports/izvjestaj_kategorija_b.docx`
 
 ## Trenutni najbolji rezultat
 
-Najbolji setup koji je trenutno spreman u repou je weighted ensemble ova dva checkpointa plus tuned learned face refiner:
+Najbolji setup u repou je weighted ensemble ova dva checkpointa plus tuned learned face refiner:
 
 - `artifacts/checkpoints/baseline_full_v1/best.pt`
 - `artifacts/checkpoints/text_bgru_v1_cpu/best.pt`
@@ -33,31 +31,9 @@ Ensemble rezultat na validation splitu:
 - Mouth-only MAE: `0.0217408`
 - JawOpen MAE: `0.0239838`
 
-Najbolji pojedinacni checkpoint po MAE i dalje je `baseline_full_v1`, dok `text_bgru_v1_cpu` sluzi kao drugi clan ensemble-a. Taj model je istreniran nakon ispravke citanja transkripata iz Excel fajlova, pa sada koristi stvarni tekst umjesto rednih brojeva uzoraka. Zavrsni dobitak je dosao iz weighted raw-space averaging-a (`0.6 / 0.4`) i dodatnog tuninga Ridge face refiner-a.
+Najbolji pojedinačni checkpoint po MAE je `baseline_full_v1`, dok `text_bgru_v1_cpu` služi kao drugi član ensemble-a.
+Finalni local submission je `artifacts/predictions/final_test_submission/` sa `baseline_full_v1 + text_bgru_v1_cpu + weighted averaging + text_ensemble_weighted_face_refiner_v1`.
 
-Finalni local submission je regenerisan u `artifacts/predictions/final_test_submission/` sa `baseline_full_v1 + text_bgru_v1_cpu + weighted averaging + text_ensemble_weighted_face_refiner_v1`. Avatar demo verzija sa reproducibilnim treptanjem je u `artifacts/predictions/final_test_avatar_ready/`.
-
-Najvazniji grafici su vec generisani:
-
-- `reports/figures/dataset_overview.png`
-- `reports/figures/blendshape_activity.png`
-- `reports/figures/phoneme_distribution.png`
-- `reports/figures/text_ensemble_weighted_refined/validation_per_blendshape_mae.png`
-- `reports/figures/text_ensemble_weighted_refined/ensemble_spk08_001_overlay.png`
-- `reports/figures/text_ensemble_refined_default/validation_per_blendshape_mae.png`
-- `reports/figures/text_ensemble_refined_default/ensemble_spk08_001_overlay.png`
-- `reports/figures/text_ensemble_default/validation_per_blendshape_mae.png`
-- `reports/figures/ensemble_refined_default/validation_per_blendshape_mae.png`
-- `reports/figures/ensemble_refined_default/ensemble_spk08_001_overlay.png`
-- `reports/figures/ensemble_default/validation_per_blendshape_mae.png`
-- `reports/figures/ensemble_default/ensemble_spk08_001_overlay.png`
-- `artifacts/checkpoints/baseline_full_v1/training_curves.png`
-- `artifacts/checkpoints/baseline_full_v1/val_per_blendshape_mae.png`
-- `artifacts/checkpoints/baseline_full_v1/spk08_001_overlay.png`
-- `artifacts/checkpoints/text_bgru_v1_cpu/training_curves.png`
-- `artifacts/checkpoints/text_bgru_v1_cpu/val_per_blendshape_mae.png`
-- `artifacts/checkpoints/hybrid_bgru_v1/training_curves.png`
-- `artifacts/checkpoints/hybrid_bgru_v1/val_per_blendshape_mae.png`
 
 ## Struktura
 
@@ -76,15 +52,15 @@ Najvazniji grafici su vec generisani:
 - `scripts/infer_folder.py`
   - inferenca nad folderom sa `.wav` fajlovima za jedan checkpoint ili ensemble, uz opcioni face refiner
 - `scripts/search_ensemble_weights.py`
-  - pretraga najboljih tezina za ensemble od dva checkpointa
+  - pretraga najboljih težina za ensemble od dva checkpointa
 - `scripts/pseudo_label_synth.py`
-  - pseudo-labeling sintetizovanog audija i gradnja mjesovitog manifesta
+  - pseudo-labeling sintetizovanog audija i gradnja mješovitog manifesta
 - `scripts/build_kfold_splits.py`
   - generisanje speaker-balanced k-fold splitova nad prirodnim snimcima
 - `scripts/benchmark_backbones.py`
-  - brzo poredjenje mel vs `HuBERT` vs `WavLM` feature extraction troska
+  - brzo poređenje mel vs `HuBERT` vs `WavLM` feature extraction troška
 - `scripts/postprocess_blinks.py`
-  - dodaje reproducibilna nasumicna treptanja nad vec generisanim `CSV` fajlovima za avatar demo
+  - dodaje reproducibilna nasumična treptanja nad već generisanim `CSV` fajlovima za avatar demo
 - `src/blendshape_project/face_refiner.py`
   - helper kod za learned full-face refinement
 - `src/blendshape_project/blink_postprocess.py`
@@ -92,7 +68,7 @@ Najvazniji grafici su vec generisani:
 - `notebooks/competition_pipeline_colab.ipynb`
   - Colab workflow
 - `artifacts/checkpoints/baseline_full_v1/`
-  - najbolji pojedinacni checkpoint
+  - najbolji pojedinačni checkpoint
 - `artifacts/checkpoints/hybrid_bgru_v1/`
   - prethodni hibridni `bgru` checkpoint
 - `artifacts/checkpoints/text_bgru_v1_cpu/`
@@ -100,7 +76,7 @@ Najvazniji grafici su vec generisani:
 - `artifacts/refiners/`
   - spremljen face refiner i njegove metrike
 - `reports/izvjestaj_kategorija_b.md` i `reports/izvjestaj_kategorija_b.docx`
-  - izvjestaj za predaju
+  - izvještaj za predaju
 
 ## Brzi start lokalno
 
