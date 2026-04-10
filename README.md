@@ -73,10 +73,6 @@ Finalni local submission je `artifacts/predictions/final_test_submission/` sa `b
   - prethodni hibridni `bgru` checkpoint
 - `artifacts/checkpoints/text_bgru_v1_cpu/`
   - novi text-aware `bgru` checkpoint za najbolji ensemble
-- `artifacts/refiners/`
-  - spremljen face refiner i njegove metrike
-- `reports/izvjestaj_kategorija_b.md` i `reports/izvjestaj_kategorija_b.docx`
-  - izvještaj za predaju
 
 ## Brzi start lokalno
 
@@ -99,13 +95,13 @@ python scripts/analyze_data.py
 python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --device cuda --output-dir reports/figures/text_ensemble_weighted_refined
 ```
 
-4. Trening novog jaceg offline modela:
+4. Jaci offline modela:
 
 ```powershell
 python scripts/train.py --run-name improved_full_run --epochs 18 --batch-size 8 --device cuda --temporal-encoder bgru
 ```
 
-Ako hoces samo da provjeris da setup radi bez novog treninga, evaluiraj vec prilozeni checkpoint:
+Bez novog treninga evaluacija vec prilozeni checkpoint:
 
 ```powershell
 python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt --device cuda
@@ -129,30 +125,22 @@ python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_
 python scripts/infer_folder.py --checkpoint artifacts/checkpoints/improved_full_run/best.pt --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda
 ```
 
-8. Ako hoces da avatar povremeno trepce u demou, dodaj blink post-processing direktno u inferenci:
+8. Avatar povremeno trepce, blink post-processing direktno u inferenci:
 
 ```powershell
 python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --input-dir path\do\wav_foldera --output-dir artifacts/predictions/test_run --device cuda --random-blinks --blink-strength 1.0
 ```
 
-9. Ako vec imas generisane `CSV` fajlove i samo hoces blink verziju za avatar:
+9. `CSV` fajlovi za blink verziju za avatar:
 
 ```powershell
 python scripts/postprocess_blinks.py --input-dir artifacts/predictions/avatar_demo_synth_refined --output-dir artifacts/predictions/avatar_demo_synth_refined_blinks --audio-dir artifacts/predictions/avatar_demo_synth_refined
 ```
 
-## Colab workflow
 
-U Colabu koristi `notebooks/competition_pipeline_colab.ipynb`.
 
-Bitna napomena za Git:
 
-- u ovom folderu postoje veliki fajlovi
-- zato je repo pripremljen za `git-lfs`
-- originalne arhive ostaju source-of-truth
-- `data/extracted/` se ne verzionise da ne duplira ogromne podatke
-
-Ako budes radio iz GitHub-a i Colaba:
+GitHub i Colab:
 
 ```bash
 git lfs install
@@ -189,19 +177,17 @@ U repou ne treba da budu:
 - lokalni avatar demo outputi
 - cache folderi
 
-Za lokalno povezivanje na GitHub koristi helper skriptu:
+
 
 ```powershell
 python scripts/setup_github_remote.py --username YOUR_GITHUB_USERNAME
 ```
 
-Ako hoces odmah i push:
 
 ```powershell
 python scripts/setup_github_remote.py --username YOUR_GITHUB_USERNAME --push
 ```
 
-Ako zelis samo da vidis koji ce URL biti postavljen:
 
 ```powershell
 python scripts/setup_github_remote.py --username YOUR_GITHUB_USERNAME --print-only
@@ -223,7 +209,8 @@ To radi:
 - `python scripts/prepare_data.py`
 - opciono `python scripts/analyze_data.py`
 
-Ako hoces rucno:
+
+Rucno:
 
 ```bash
 !apt-get -qq update
@@ -259,7 +246,7 @@ Novi default setup koristi log-mel + delta + delta-delta audio feature-e na `60 
 
 `scripts/evaluate.py` i `scripts/infer_folder.py` sada podrzavaju vise `--checkpoint` argumenata i rade raw-space averaging, a zatim opciono i face refinement, pa dobijes ensemble bez dodatnog koda.
 
-## Ideje za jos bolji plasman
+##  Unapredjenja
 
 - pseudo-labeling nad `audio_synth`
 - jaci multimodal encoder tipa Conformer ili pretrained speech backbone (`HuBERT`/`WavLM`)
