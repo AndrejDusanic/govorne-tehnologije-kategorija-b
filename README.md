@@ -15,7 +15,7 @@ Trenutno je implementiran i provjeren kompletan audio/text pipeline:
 - Colab notebook za pokretanje svega iz Git repozitorija
 - izvještaj za predaju u `reports/izvjestaj_kategorija_b.md` i `reports/izvjestaj_kategorija_b.docx`
 
-## Trenutni najbolji rezultat
+## Najbolji rezultat
 
 Najbolji setup u repou je weighted ensemble ova dva checkpointa plus tuned learned face refiner:
 
