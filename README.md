@@ -73,7 +73,7 @@ Finalni local submission je `artifacts/predictions/final_test_submission/` sa `b
 - `artifacts/checkpoints/text_bgru_v1_cpu/`
   - novi text-aware `bgru` checkpoint za najbolji ensemble
 
-## Brzi start lokalno
+## Start lokalno
 
 1. Instalacija:
 
@@ -146,7 +146,7 @@ git lfs install
 git lfs pull
 ```
 
-## GitHub private repo setup
+## GitHub private repo
 
 Predlozeni naziv private repoa:
 
@@ -192,9 +192,9 @@ python scripts/setup_github_remote.py --username YOUR_GITHUB_USERNAME --push
 python scripts/setup_github_remote.py --username YOUR_GITHUB_USERNAME --print-only
 ```
 
-## Colab quick start
+## Colab
 
-Najbrzi nacin nakon kloniranja repoa u Colabu:
+Kloniranje repoa u Colabu:
 
 ```bash
 bash scripts/colab_bootstrap.sh --with-analysis
@@ -221,19 +221,19 @@ Rucno:
 !python scripts/analyze_data.py
 ```
 
-Ako hoces samo evaluaciju vec istreniranog modela:
+Evaluacija istreniranog modela:
 
 ```bash
 !python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --device cuda --output-dir reports/figures/text_ensemble_weighted_refined
 ```
 
-Ako hoces trening u Colabu:
+Trening u Colabu:
 
 ```bash
 !python scripts/train.py --run-name improved_full_run --epochs 18 --batch-size 8 --device cuda --temporal-encoder bgru
 ```
 
-Ako hoces inferencu nad test WAV folderom:
+Inferencu nad test WAV folderom:
 
 ```bash
 !python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --input-dir test_wavs --output-dir artifacts/predictions/colab_test --device cuda
@@ -282,11 +282,3 @@ Komanda:
 ```powershell
 python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --input-dir test_wavs --text-dir test_texts --output-dir artifacts/predictions/test_run --device cuda
 ```
-
-## Eksperimenti iz zavrsnog prolaza
-
-- `weighted ensemble + tuned refiner` je donio novi najbolji validation `MAE` bez primjetnog rasta inference troska; finalni local submission sada ima prosjecni CPU `RTF ~ 0.03394`
-- `synth/domain adaptation` je isproban preko pseudo-labeling-a nad `audio_synth` i kratkog fine-tuning-a (`text_bgru_v1_synth_ft`), ali nije nadmasio finalni ensemble
-- `HuBERT` i `WavLM` su benchmarkovani skriptom `scripts/benchmark_backbones.py`; na ovoj masini su feature-i bili mnogo sporiji od mel feature-a, pa nisu usvojeni kao novi default
-- `k-fold` tooling je dodat, ali puni k-fold retraining nije pokrenut jer bi znacajno produzio eksperiment bez garancije da ce biti bolji od finalnog submit-ready setupa
-- pravi test transkripti i dalje nisu dostupni u `test_set_catB.zip`, pa inferenca nad tim folderom radi sa praznim tekstom; kad ti transkripti postoje, novi text-aware model ih moze direktno koristiti
