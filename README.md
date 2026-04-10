@@ -13,8 +13,7 @@ Trenutno je implementiran i provjeren kompletan audio/text pipeline:
 - evaluacija sa grafikonima
 - inferenca koja generise `CSV` i `meta.json`
 - Colab notebook za pokretanje svega iz Git repozitorija
-- izvještaj za predaju u `reports/izvjestaj_kategorija_b.md` i `reports/izvjestaj_kategorija_b.docx`
-
+  
 ## Najbolji rezultat
 
 Najbolji setup u repou je weighted ensemble ova dva checkpointa plus tuned learned face refiner:
