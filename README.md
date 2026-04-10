@@ -106,7 +106,7 @@ Bez novog treninga evaluacija vec prilozeni checkpoint:
 python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt --device cuda
 ```
 
-5. Evaluacija svog novog runa:
+5. Evaluacija novog runa:
 
 ```powershell
 python scripts/evaluate.py --checkpoint artifacts/checkpoints/improved_full_run/best.pt --device cuda
@@ -145,53 +145,6 @@ GitHub i Colab:
 git lfs install
 git lfs pull
 ```
-
-## GitHub private repo
-
-Predlozeni naziv private repoa:
-
-- `govorne-tehnologije-kategorija-b`
-
-U repou treba da ostanu:
-
-- `src/`
-- `scripts/`
-- `notebooks/`
-- `requirements.txt`
-- `README.md`
-- `.gitignore`
-- `.gitattributes`
-- originalni ZIP fajlovi i PDF
-- `artifacts/checkpoints/baseline_full_v1/`
-- `artifacts/checkpoints/hybrid_bgru_v1/`
-- `artifacts/checkpoints/text_bgru_v1_cpu/`
-- `artifacts/refiners/`
-- `reports/izvjestaj_kategorija_b.md`
-- `reports/izvjestaj_kategorija_b.docx`
-
-U repou ne treba da budu:
-
-- `data/extracted/`
-- `artifacts/tmp/`
-- lokalni avatar demo outputi
-- cache folderi
-
-
-
-```powershell
-python scripts/setup_github_remote.py --username YOUR_GITHUB_USERNAME
-```
-
-
-```powershell
-python scripts/setup_github_remote.py --username YOUR_GITHUB_USERNAME --push
-```
-
-
-```powershell
-python scripts/setup_github_remote.py --username YOUR_GITHUB_USERNAME --print-only
-```
-
 ## Colab
 
 Kloniranje repoa u Colabu:
@@ -239,11 +192,6 @@ Inferencu nad test WAV folderom:
 !python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --input-dir test_wavs --output-dir artifacts/predictions/colab_test --device cuda
 ```
 
-## Model u jednoj recenici
-
-Novi default setup koristi log-mel + delta + delta-delta audio feature-e na `60 FPS`, speaker conditioning, stvarni text conditioning preko karakter-level attention grane u `text_bgru_v1_cpu`, bidirectional GRU temporal encoder, dodatni fonemski supervision, peak-aware loss za usne koeficijente, weighted averaging `0.6 / 0.4` i learned face refiner za jacu mimiku cijelog lica.
-
-`scripts/evaluate.py` i `scripts/infer_folder.py` sada podrzavaju vise `--checkpoint` argumenata i rade raw-space averaging, a zatim opciono i face refinement, pa dobijes ensemble bez dodatnog koda.
 
 ##  Unapredjenja
 
@@ -254,31 +202,3 @@ Novi default setup koristi log-mel + delta + delta-delta audio feature-e na `60 
 - k-fold validacija prije finalnog treninga
 - dodavanje stvarnih `.txt` transkripata za test fajlove kada su dostupni, jer novi model sada stvarno koristi tekst
 
-## Novi trening komande
-
-Za novi kvalitetniji offline model:
-
-```powershell
-python scripts/train.py --run-name improved_full_run --epochs 18 --batch-size 8 --device cuda --temporal-encoder bgru
-```
-
-Ako zelis stari strogo kauzalni mod:
-
-```powershell
-python scripts/train.py --run-name causal_run --epochs 18 --batch-size 8 --device cuda --temporal-encoder causal_tcn --no-text-conditioning
-```
-
-## Inferenca sa tekstom
-
-Ako uz audio imas i tekst po fajlu, napravi folder sa `.txt` fajlovima istog naziva kao `.wav`.
-
-Primjer:
-
-- `test_wavs/spk08_test.wav`
-- `test_texts/spk08_test.txt`
-
-Komanda:
-
-```powershell
-python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --input-dir test_wavs --text-dir test_texts --output-dir artifacts/predictions/test_run --device cuda
-```
