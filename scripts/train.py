@@ -15,7 +15,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from blendshape_project.constants import BLENDSHAPE_NAMES, SPEAKER_ORDER, blendshape_priority_weights  # noqa: E402
+from blendshape_project.constants import BLENDSHAPE_NAMES, blendshape_priority_weights, sort_speakers  # noqa: E402
 from blendshape_project.aux_labels import available_aux_target_types, available_viseme_variants, build_aux_vocab  # noqa: E402
 from blendshape_project.data import (  # noqa: E402
     AudioFeatureExtractor,
@@ -43,6 +43,30 @@ def select_device(requested: str) -> torch.device:
         print("CUDA was requested but is not available. Falling back to CPU.")
         return torch.device("cpu")
     return torch.device(requested)
+
+
+def load_compatible_checkpoint(model: torch.nn.Module, checkpoint_path: Path, device: torch.device) -> None:
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    current_state = model.state_dict()
+    checkpoint_state = checkpoint["model_state"]
+    compatible_state = {}
+    skipped: list[str] = []
+
+    for key, value in checkpoint_state.items():
+        if key not in current_state:
+            skipped.append(f"{key} (missing in target model)")
+            continue
+        if current_state[key].shape != value.shape:
+            skipped.append(f"{key} (checkpoint {tuple(value.shape)} vs model {tuple(current_state[key].shape)})")
+            continue
+        compatible_state[key] = value
+
+    model.load_state_dict(compatible_state, strict=False)
+    print(f"Initialized model from {checkpoint_path} using {len(compatible_state)} compatible tensors.")
+    if skipped:
+        preview = ", ".join(skipped[:8])
+        suffix = " ..." if len(skipped) > 8 else ""
+        print(f"Skipped {len(skipped)} incompatible tensors: {preview}{suffix}")
 
 
 def main() -> None:
@@ -97,7 +121,8 @@ def main() -> None:
             aux_target_type=args.aux_target_type,
             viseme_variant=args.viseme_variant,
         )
-    speaker_to_id = {speaker: idx for idx, speaker in enumerate(SPEAKER_ORDER)}
+    speaker_names = sort_speakers(frame["speaker"].dropna().astype(str).tolist())
+    speaker_to_id = {speaker: idx for idx, speaker in enumerate(speaker_names)}
 
     train_df = frame[frame["sample_id"].isin(split["train"])].copy()
     val_df = frame[frame["sample_id"].isin(split["val"])].copy()
@@ -168,9 +193,7 @@ def main() -> None:
         num_gru_layers=args.num_gru_layers,
     ).to(device)
     if args.init_checkpoint is not None:
-        init_checkpoint = torch.load(args.init_checkpoint, map_location=device, weights_only=False)
-        model.load_state_dict(init_checkpoint["model_state"], strict=False)
-        print(f"Initialized model from {args.init_checkpoint}")
+        load_compatible_checkpoint(model, args.init_checkpoint, device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(args.epochs, 1))

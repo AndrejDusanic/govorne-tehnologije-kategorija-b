@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import random
+import re
 import shutil
 import sys
 import zipfile
@@ -23,7 +24,8 @@ from blendshape_project.constants import (  # noqa: E402
     PHONEME_PAD,
     PHONEME_SIL,
     PHONEME_UNK,
-    SPEAKER_ORDER,
+    canonical_speaker_name,
+    sort_speakers,
 )
 from blendshape_project.io_utils import (  # noqa: E402
     ensure_dir,
@@ -42,6 +44,106 @@ def ensure_extracted(archive_path: Path, destination: Path) -> None:
         return
     ensure_dir(destination)
     shutil.unpack_archive(str(archive_path), str(destination))
+
+
+def sanitize_path_fragment(value: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9]+", "_", value).strip("_").lower()
+
+
+def normalize_media_name(name: str, speaker: str) -> str:
+    suffix = Path(name).suffix.lower()
+    if suffix not in {".csv", ".wav"}:
+        return name
+    lowered = name.lower()
+    if lowered.startswith(f"{speaker}_"):
+        return name
+    match = re.search(r"(\d+)", Path(name).stem)
+    if not match:
+        return name
+    return f"{speaker}_{int(match.group(1)):03d}{suffix}"
+
+
+def discover_speaker_archives(root: Path) -> dict[str, Path]:
+    archives: dict[str, Path] = {}
+    for archive_path in root.glob("*.zip"):
+        stem_lower = archive_path.stem.lower()
+        if "blendshape" not in stem_lower and "speaker_" not in stem_lower and not stem_lower.startswith("spk"):
+            continue
+        try:
+            speaker = canonical_speaker_name(stem_lower)
+        except ValueError:
+            continue
+
+        previous = archives.get(speaker)
+        if previous is None:
+            archives[speaker] = archive_path
+            continue
+
+        previous_stat = previous.stat()
+        current_stat = archive_path.stat()
+        if (current_stat.st_size, current_stat.st_mtime) > (previous_stat.st_size, previous_stat.st_mtime):
+            archives[speaker] = archive_path
+
+    return {speaker: archives[speaker] for speaker in sort_speakers(list(archives.keys()))}
+
+
+def discover_labels_archive(root: Path) -> Path:
+    candidates = [path for path in root.glob("labels_aligned*.zip") if path.is_file()]
+    if not candidates:
+        legacy = root / EXPECTED_RAW_FILES["labels_zip"]
+        if legacy.exists():
+            return legacy
+        raise FileNotFoundError("Could not find any labels_aligned*.zip archive in the project root.")
+    return max(candidates, key=lambda path: (path.stat().st_size, path.stat().st_mtime))
+
+
+def resolve_alignment_root(extracted_labels_root: Path) -> Path:
+    for per_phoneme_dir in extracted_labels_root.rglob("per_phoneme"):
+        candidate_root = per_phoneme_dir.parent
+        if (candidate_root / "per_word").exists():
+            return candidate_root
+    raise FileNotFoundError(f"Could not locate per_phoneme/per_word alignment folders under {extracted_labels_root}")
+
+
+def normalize_speaker_extract(speaker_root: Path, speaker: str) -> None:
+    renamed_dir = ensure_dir(speaker_root / f"renamed_{speaker}")
+    transcript_out = speaker_root / f"{speaker}_transcript.xlsx"
+
+    source_dirs = [path for path in speaker_root.rglob("*") if path.is_dir() and path.name.lower().endswith("_blendshapes_and_audio")]
+    if not source_dirs and renamed_dir.exists():
+        source_dirs = [renamed_dir]
+
+    for source_dir in source_dirs:
+        for item in source_dir.iterdir():
+            if item.suffix.lower() not in {".csv", ".wav"}:
+                continue
+            target = renamed_dir / normalize_media_name(item.name, speaker)
+            if not target.exists():
+                shutil.copy2(item, target)
+
+    transcript_candidates = [path for path in speaker_root.rglob("*_transcript.xlsx")]
+    if not transcript_out.exists() and transcript_candidates:
+        shutil.copy2(transcript_candidates[0], transcript_out)
+
+    csv_count = len(list(renamed_dir.glob("*.csv")))
+    wav_count = len(list(renamed_dir.glob("*.wav")))
+    if csv_count == 0 or wav_count == 0:
+        raise FileNotFoundError(f"Normalized folder {renamed_dir} does not contain paired CSV/WAV files for {speaker}.")
+    if not transcript_out.exists():
+        raise FileNotFoundError(f"Could not locate transcript XLSX for speaker {speaker} under {speaker_root}.")
+
+
+def discover_speaker_roots(extracted_root: Path) -> dict[str, Path]:
+    speaker_roots: dict[str, Path] = {}
+    for path in extracted_root.glob("*_blendshapes"):
+        if not path.is_dir():
+            continue
+        try:
+            speaker = canonical_speaker_name(path.name)
+        except ValueError:
+            continue
+        speaker_roots[speaker] = path
+    return {speaker: speaker_roots[speaker] for speaker in sort_speakers(list(speaker_roots.keys()))}
 
 
 def extract_avatar_metadata(archive_path: Path, output_path: Path) -> None:
@@ -77,21 +179,30 @@ def build_manifests(seed: int, val_fraction: float) -> dict[str, int]:
     ensure_dir(extracted_root)
     ensure_dir(data_root / "manifests")
 
-    ensure_extracted(ROOT / EXPECTED_RAW_FILES["spk08_zip"], extracted_root / "spk08_blendshapes")
-    ensure_extracted(ROOT / EXPECTED_RAW_FILES["spk14_zip"], extracted_root / "spk14_blendshapes")
-    ensure_extracted(ROOT / EXPECTED_RAW_FILES["labels_zip"], extracted_root / "labels_aligned")
+    speaker_archives = discover_speaker_archives(ROOT)
+    for speaker, archive_path in speaker_archives.items():
+        speaker_root = extracted_root / f"{speaker}_blendshapes"
+        ensure_extracted(archive_path, speaker_root)
+        normalize_speaker_extract(speaker_root, speaker)
+
+    labels_archive = discover_labels_archive(ROOT)
+    labels_extract_root = extracted_root / f"labels_{sanitize_path_fragment(labels_archive.stem)}"
+    ensure_extracted(labels_archive, labels_extract_root)
+
     ensure_extracted(ROOT / EXPECTED_RAW_FILES["synth_zip"], extracted_root / "audio_synth")
     extract_avatar_metadata(ROOT / EXPECTED_RAW_FILES["avatar_zip"], data_root / "manifests" / "avatar_blendshape_names.txt")
 
     natural_records: list[dict[str, object]] = []
     synth_records: list[dict[str, object]] = []
 
-    label_root = extracted_root / "labels_aligned" / "labels_aligned"
+    label_root = resolve_alignment_root(labels_extract_root)
     phoneme_dir = label_root / "per_phoneme"
     word_dir = label_root / "per_word"
+    speaker_roots = discover_speaker_roots(extracted_root)
+    speakers = sort_speakers(list(speaker_roots.keys()))
 
-    for speaker in SPEAKER_ORDER:
-        speaker_root = extracted_root / f"{speaker}_blendshapes"
+    for speaker in speakers:
+        speaker_root = speaker_roots[speaker]
         transcript_path = speaker_root / f"{speaker}_transcript.xlsx"
         transcripts = read_transcripts_xlsx(transcript_path)
         renamed_dir = speaker_root / f"renamed_{speaker}"
@@ -121,9 +232,12 @@ def build_manifests(seed: int, val_fraction: float) -> dict[str, int]:
             )
 
     synth_dir = extracted_root / "audio_synth" / "synth"
-    for speaker in SPEAKER_ORDER:
-        transcripts = read_transcripts_xlsx(extracted_root / f"{speaker}_blendshapes" / f"{speaker}_transcript.xlsx")
+    for speaker in speakers:
+        transcript_path = speaker_roots[speaker] / f"{speaker}_transcript.xlsx"
+        transcripts = read_transcripts_xlsx(transcript_path)
         synth_paths = sorted_numeric_paths(list(synth_dir.glob(f"{speaker}_*.wav")))
+        if not synth_paths:
+            continue
         numbers = [sample_number_from_name(path) for path in synth_paths]
         transcript_offset = 1 if numbers and min(numbers) == 0 and max(numbers) == len(transcripts) - 1 else 0
         for wav_path in synth_paths:
@@ -153,7 +267,7 @@ def build_manifests(seed: int, val_fraction: float) -> dict[str, int]:
     all_df = pd.concat([natural_df, synth_df], ignore_index=True)
 
     split_payload: dict[str, list[str]] = {"train": [], "val": []}
-    for speaker in SPEAKER_ORDER:
+    for speaker in speakers:
         speaker_ids = natural_df[natural_df["speaker"] == speaker]["sample_id"].tolist()
         train_ids, val_ids = split_sample_ids(speaker_ids, seed=seed, val_fraction=val_fraction)
         split_payload["train"].extend(train_ids)

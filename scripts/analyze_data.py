@@ -20,18 +20,22 @@ from blendshape_project.io_utils import read_alignment, read_blendshape_csv  # n
 
 
 def plot_dataset_overview(frame: pd.DataFrame, output_path: Path) -> None:
+    speakers = sorted(frame["speaker"].unique().tolist())
+    color_map = plt.get_cmap("tab10", max(len(speakers), 1))
+    speaker_colors = {speaker: color_map(index) for index, speaker in enumerate(speakers)}
+
     plt.figure(figsize=(12, 5))
     plt.subplot(1, 2, 1)
-    counts = frame.groupby("speaker")["sample_id"].count().reindex(sorted(frame["speaker"].unique()))
-    plt.bar(counts.index.tolist(), counts.values.tolist(), color=["#2563eb", "#dc2626"])
+    counts = frame.groupby("speaker")["sample_id"].count().reindex(speakers)
+    plt.bar(counts.index.tolist(), counts.values.tolist(), color=[speaker_colors[speaker] for speaker in counts.index.tolist()])
     plt.title("Natural samples per speaker")
     plt.ylabel("Count")
     plt.grid(axis="y", alpha=0.3)
 
     plt.subplot(1, 2, 2)
-    for speaker, color in [("spk08", "#2563eb"), ("spk14", "#dc2626")]:
+    for speaker in speakers:
         values = frame.loc[frame["speaker"] == speaker, "duration_sec"]
-        plt.hist(values, bins=20, alpha=0.55, label=speaker, color=color)
+        plt.hist(values, bins=20, alpha=0.45, label=speaker, color=speaker_colors[speaker])
     plt.title("Audio duration distribution")
     plt.xlabel("Seconds")
     plt.ylabel("Samples")
@@ -115,4 +119,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

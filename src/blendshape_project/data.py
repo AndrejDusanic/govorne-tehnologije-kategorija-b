@@ -24,9 +24,9 @@ from .constants import (
     N_BLENDSHAPES,
     PHONEME_PAD,
     PHONEME_UNK,
-    SPEAKER_ORDER,
     TEXT_PAD,
     TEXT_UNK,
+    sort_speakers,
 )
 from .aux_labels import project_aux_label
 from .io_utils import framewise_phoneme_labels, read_alignment, read_blendshape_csv
@@ -228,7 +228,11 @@ class BlendshapeDataset(Dataset):
         self.stats = stats
         self.phoneme_vocab = phoneme_vocab or {PHONEME_PAD: 0, PHONEME_UNK: 1}
         self.char_vocab = char_vocab or {TEXT_PAD: 0, TEXT_UNK: 1}
-        self.speaker_to_id = speaker_to_id or {speaker: idx for idx, speaker in enumerate(SPEAKER_ORDER)}
+        if speaker_to_id is None:
+            speakers = sort_speakers(self.frame["speaker"].dropna().astype(str).tolist())
+            self.speaker_to_id = {speaker: idx for idx, speaker in enumerate(speakers)}
+        else:
+            self.speaker_to_id = speaker_to_id
         self.aux_target_type = aux_target_type
         self.viseme_variant = viseme_variant
         self.feature_mean = None

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 BLENDSHAPE_NAMES = [
@@ -66,7 +67,7 @@ EXPECTED_RAW_FILES = {
     "avatar_zip": "avatar.zip",
 }
 
-SPEAKER_ORDER = ["spk08", "spk14"]
+SPEAKER_ORDER = ["spk03", "spk04", "spk05", "spk08", "spk14"]
 N_BLENDSHAPES = len(BLENDSHAPE_NAMES)
 DEFAULT_SAMPLE_RATE = 44_100
 DEFAULT_FPS = 60
@@ -82,6 +83,24 @@ TEXT_UNK = "<unk>"
 
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
+
+
+def canonical_speaker_name(raw_value: str) -> str:
+    match = re.search(r"(?:spk|speaker[_\-\s]?)(\d{1,2})", raw_value.lower())
+    if not match:
+        raise ValueError(f"Could not infer canonical speaker name from {raw_value!r}")
+    return f"spk{int(match.group(1)):02d}"
+
+
+def speaker_sort_key(speaker: str) -> tuple[int, str]:
+    match = re.search(r"(\d{1,2})", speaker.lower())
+    if match:
+        return int(match.group(1)), speaker.lower()
+    return 10_000, speaker.lower()
+
+
+def sort_speakers(speakers: list[str]) -> list[str]:
+    return sorted(dict.fromkeys(speakers), key=speaker_sort_key)
 
 
 def blendshape_priority_weights() -> list[float]:

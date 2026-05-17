@@ -33,7 +33,14 @@ def load_model_bundle(
     path = Path(checkpoint_path)
     checkpoint = torch.load(path, map_location=device, weights_only=False)
     stats = DatasetStats.from_json(checkpoint["stats"])
-    speaker_to_id = checkpoint.get("speaker_to_id", {speaker: idx for idx, speaker in enumerate(SPEAKER_ORDER)})
+    speaker_to_id = checkpoint.get("speaker_to_id")
+    if speaker_to_id is None:
+        legacy_order = ["spk08", "spk14", *[speaker for speaker in SPEAKER_ORDER if speaker not in {"spk08", "spk14"}]]
+        embedding = checkpoint.get("model_state", {}).get("speaker_embedding.weight")
+        if embedding is not None:
+            speaker_to_id = {speaker: idx for idx, speaker in enumerate(legacy_order[: embedding.shape[0]])}
+        else:
+            speaker_to_id = {speaker: idx for idx, speaker in enumerate(legacy_order)}
     phoneme_vocab = checkpoint.get("phoneme_vocab", {"<pad>": 0, "<unk>": 1})
     phoneme_vocab = checkpoint.get("aux_vocab", phoneme_vocab)
     char_vocab = checkpoint.get("char_vocab", {"<pad>": 0, "<unk>": 1})

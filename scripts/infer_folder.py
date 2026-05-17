@@ -16,7 +16,7 @@ if str(SRC) not in sys.path:
 
 from blendshape_project.checkpoint_utils import load_model_bundle, predict_raw_blendshapes  # noqa: E402
 from blendshape_project.blink_postprocess import apply_random_blinks  # noqa: E402
-from blendshape_project.constants import DEFAULT_FPS, SPEAKER_ORDER  # noqa: E402
+from blendshape_project.constants import DEFAULT_FPS, sort_speakers  # noqa: E402
 from blendshape_project.data import AudioFeatureExtractor, load_waveform, text_to_char_ids  # noqa: E402
 from blendshape_project.face_refiner import apply_face_refiner, load_face_refiner  # noqa: E402
 from blendshape_project.io_utils import save_json, write_blendshape_csv  # noqa: E402
@@ -55,6 +55,15 @@ def infer_speaker_id(filename: str, speaker_to_id: dict[str, int], default_speak
     return speaker_to_id[default_speaker]
 
 
+def resolve_default_speaker(requested: str, speaker_to_id: dict[str, int]) -> str:
+    if requested and requested in speaker_to_id:
+        return requested
+    ordered = sort_speakers(list(speaker_to_id.keys()))
+    if not ordered:
+        raise ValueError("speaker_to_id mapping is empty; cannot resolve a default speaker.")
+    return ordered[0]
+
+
 def read_text_for_audio(wav_path: Path, text_dir: Path | None, default_text: str) -> str:
     if text_dir is None:
         return default_text
@@ -71,7 +80,7 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=ROOT / "artifacts" / "predictions")
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--ensemble-weights", type=str, default=None)
-    parser.add_argument("--default-speaker", type=str, choices=SPEAKER_ORDER, default="spk08")
+    parser.add_argument("--default-speaker", type=str, default="")
     parser.add_argument("--text-dir", type=Path, default=None)
     parser.add_argument("--default-text", type=str, default="")
     parser.add_argument("--face-refiner", type=Path, default=None)
@@ -131,7 +140,8 @@ def main() -> None:
             dummy_lengths = torch.tensor([dummy_frames], dtype=torch.long, device=device)
             dummy_predictions = []
             for bundle in bundles:
-                dummy_speaker_id = bundle.speaker_to_id[args.default_speaker]
+                default_speaker = resolve_default_speaker(args.default_speaker, bundle.speaker_to_id)
+                dummy_speaker_id = bundle.speaker_to_id[default_speaker]
                 dummy_speaker_ids = torch.tensor([dummy_speaker_id], dtype=torch.long, device=device)
                 dummy_text_ids = text_to_char_ids(args.default_text, bundle.char_vocab).unsqueeze(0).to(device)
                 dummy_text_lengths = torch.tensor([dummy_text_ids.shape[1]], dtype=torch.long, device=device)
@@ -166,7 +176,8 @@ def main() -> None:
 
             raw_predictions = []
             for bundle in bundles:
-                speaker_id = infer_speaker_id(wav_path.stem, bundle.speaker_to_id, args.default_speaker)
+                default_speaker = resolve_default_speaker(args.default_speaker, bundle.speaker_to_id)
+                speaker_id = infer_speaker_id(wav_path.stem, bundle.speaker_to_id, default_speaker)
                 speaker_ids = torch.tensor([speaker_id], dtype=torch.long, device=device)
                 text_ids = text_to_char_ids(text, bundle.char_vocab).unsqueeze(0).to(device)
                 text_lengths = torch.tensor([text_ids.shape[1]], dtype=torch.long, device=device)

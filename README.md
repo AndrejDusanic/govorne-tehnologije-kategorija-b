@@ -33,6 +33,32 @@ Ensemble rezultat na validation splitu:
 Najbolji pojedinačni checkpoint po MAE je `baseline_full_v1`, dok `text_bgru_v1_cpu` služi kao drugi član ensemble-a.
 Finalni local submission je `artifacts/predictions/final_test_submission/` sa `baseline_full_v1 + text_bgru_v1_cpu + weighted averaging + text_ensemble_weighted_face_refiner_v1`.
 
+## Prosirena baza
+
+`scripts/prepare_data.py` sada automatski prepoznaje i ukljucuje dodatne speaker ZIP-ove i noviju verziju poravnanja ako su ubaceni u koren projekta.
+
+Trenutno prosirena lokalna baza sadrzi:
+
+- `spk03`: `150` prirodnih uzoraka
+- `spk04`: `150` prirodnih uzoraka
+- `spk05`: `150` prirodnih uzoraka
+- `spk08`: `178` prirodnih uzoraka
+- `spk14`: `180` prirodnih uzoraka
+- ukupno prirodnih: `808`
+- sintetickih: `353`
+
+Najnoviji checkpoint istreniran bas na toj prosirenoj bazi je:
+
+- `artifacts/checkpoints/expanded_bgru_no_speaker_v1/best.pt`
+- `artifacts/refiners/expanded_bgru_no_speaker_v1_face_refiner.npz`
+
+Rezultat tog prosirenog offline run-a sa refinerom:
+
+- Validation MAE: `0.022997`
+- Validation RMSE: `0.048466`
+- Mouth-only MAE: `0.024354`
+- JawOpen MAE: `0.039365`
+
 
 ## Struktura
 
@@ -88,6 +114,8 @@ python scripts/prepare_data.py
 python scripts/analyze_data.py
 ```
 
+Ako su dodatni ZIP-ovi za `spk03`, `spk04`, `spk05` i nova poravnanja ubaceni u koren projekta, isti `prepare_data.py` ce ih automatski uvuci u manifeste.
+
 3. Najbrza provjera najboljeg spremnog setupa:
 
 ```powershell
@@ -110,6 +138,12 @@ python scripts/evaluate.py --checkpoint artifacts/checkpoints/baseline_full_v1/b
 
 ```powershell
 python scripts/evaluate.py --checkpoint artifacts/checkpoints/improved_full_run/best.pt --device cuda
+```
+
+Evaluacija najnovijeg runa sa prosirenom bazom:
+
+```powershell
+python scripts/evaluate.py --checkpoint artifacts/checkpoints/expanded_bgru_no_speaker_v1/best.pt --face-refiner artifacts/refiners/expanded_bgru_no_speaker_v1_face_refiner.npz --output-dir reports/figures/expanded_bgru_no_speaker_v1_refined --device cpu
 ```
 
 6. Inferenca nad novim audio fajlovima sa najboljim spremnim ensemble-om:
