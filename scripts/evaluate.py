@@ -166,6 +166,8 @@ def main() -> None:
             phoneme_vocab=bundle.phoneme_vocab,
             char_vocab=bundle.char_vocab,
             speaker_to_id=bundle.speaker_to_id,
+            aux_target_type=bundle.config.get("aux_target_type", "phoneme"),
+            viseme_variant=bundle.config.get("viseme_variant", "viseme_balanced_10"),
         )
         loaders.append(DataLoader(dataset, batch_size=4, shuffle=False, collate_fn=collate_batch))
 

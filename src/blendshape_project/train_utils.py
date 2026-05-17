@@ -76,8 +76,9 @@ def compute_losses(
     else:
         peak_loss = predictions.new_tensor(0.0)
 
-    phoneme_logits = outputs["phonemes"].reshape(-1, outputs["phonemes"].shape[-1])
-    phoneme_targets = batch["phoneme_ids"].reshape(-1)
+    aux_logits_tensor = outputs["aux_logits"] if "aux_logits" in outputs else outputs["phonemes"]
+    phoneme_logits = aux_logits_tensor.reshape(-1, aux_logits_tensor.shape[-1])
+    phoneme_targets = batch["aux_ids"].reshape(-1) if "aux_ids" in batch else batch["phoneme_ids"].reshape(-1)
     valid_phoneme_mask = phoneme_targets.ne(-100)
     if valid_phoneme_mask.any():
         phoneme_loss = F.cross_entropy(phoneme_logits[valid_phoneme_mask], phoneme_targets[valid_phoneme_mask])
@@ -90,6 +91,7 @@ def compute_losses(
         "regression_loss": regression_loss.detach(),
         "temporal_loss": temporal_loss.detach(),
         "peak_loss": peak_loss.detach(),
+        "aux_loss": phoneme_loss.detach(),
         "phoneme_loss": phoneme_loss.detach(),
     }
 

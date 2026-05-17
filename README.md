@@ -202,3 +202,68 @@ Inferencu nad test WAV folderom:
 - k-fold validacija prije finalnog treninga
 - dodavanje stvarnih `.txt` transkripata za test fajlove kada su dostupni, jer novi model sada stvarno koristi tekst
 
+## Novi trening komande
+
+Za novi kvalitetniji offline model:
+
+```powershell
+python scripts/train.py --run-name improved_full_run --epochs 18 --batch-size 8 --device cuda --temporal-encoder bgru
+```
+
+Ako zelis stari strogo kauzalni mod:
+
+```powershell
+python scripts/train.py --run-name causal_run --epochs 18 --batch-size 8 --device cuda --temporal-encoder causal_tcn --no-text-conditioning
+```
+
+## Inferenca sa tekstom
+
+Ako uz audio imas i tekst po fajlu, napravi folder sa `.txt` fajlovima istog naziva kao `.wav`.
+
+Primjer:
+
+- `test_wavs/spk08_test.wav`
+- `test_texts/spk08_test.txt`
+
+Komanda:
+
+```powershell
+python scripts/infer_folder.py --checkpoint artifacts/checkpoints/baseline_full_v1/best.pt artifacts/checkpoints/text_bgru_v1_cpu/best.pt --ensemble-weights 0.6,0.4 --face-refiner artifacts/refiners/text_ensemble_weighted_face_refiner_v1.npz --input-dir test_wavs --text-dir test_texts --output-dir artifacts/predictions/test_run --device cuda
+```
+
+## Conference ablations
+
+Za konferencijsko poređenje sada su direktno podržana tri nova pravca:
+
+- ukidanje speaker embeddinga preko `--no-speaker-embedding`
+- pomoćni `viseme` klasifikator preko `--aux-target-type viseme --viseme-variant ...`
+- odvojeno poređenje `TCN + refiner` naspram `BiGRU + refiner`
+
+Primjeri trening komandi:
+
+```powershell
+python scripts/train.py --run-name causal_no_speaker --epochs 18 --batch-size 8 --device cuda --temporal-encoder causal_tcn --no-text-conditioning --no-speaker-embedding
+python scripts/train.py --run-name bgru_no_speaker --epochs 18 --batch-size 8 --device cuda --temporal-encoder bgru --no-speaker-embedding
+python scripts/train.py --run-name bgru_viseme_coarse --epochs 18 --batch-size 8 --device cuda --temporal-encoder bgru --aux-target-type viseme --viseme-variant viseme_coarse_8 --no-speaker-embedding
+python scripts/train.py --run-name bgru_viseme_balanced --epochs 18 --batch-size 8 --device cuda --temporal-encoder bgru --aux-target-type viseme --viseme-variant viseme_balanced_10 --no-speaker-embedding
+python scripts/train.py --run-name bgru_viseme_fine --epochs 18 --batch-size 8 --device cuda --temporal-encoder bgru --aux-target-type viseme --viseme-variant viseme_fine_12 --no-speaker-embedding
+```
+
+Poređenje postojećih `causal` i `offline` checkpointa sa zasebno istreniranim solo refinerima:
+
+```powershell
+python scripts/compare_temporal_modes.py --causal-checkpoint artifacts/checkpoints/baseline_full_v1/best.pt --offline-checkpoint artifacts/checkpoints/text_bgru_v1_cpu/best.pt --device cpu --output-json reports/figures/temporal_mode_comparison.json
+```
+
+Na trenutnim checkpointima dobijamo tipičan tradeoff:
+
+- `baseline_full_v1 + solo refiner`: bolji `MAE` (`0.01879`)
+- `text_bgru_v1_cpu + solo refiner`: bolji `RMSE` (`0.04305`) i nešto bolji `mouth/jaw` odziv
+
+## Eksperimenti iz zavrsnog prolaza
+
+- `weighted ensemble + tuned refiner` je donio novi najbolji validation `MAE` bez primjetnog rasta inference troska; finalni local submission sada ima prosjecni CPU `RTF ~ 0.03394`
+- `synth/domain adaptation` je isproban preko pseudo-labeling-a nad `audio_synth` i kratkog fine-tuning-a (`text_bgru_v1_synth_ft`), ali nije nadmasio finalni ensemble
+- `HuBERT` i `WavLM` su benchmarkovani skriptom `scripts/benchmark_backbones.py`; na ovoj masini su feature-i bili mnogo sporiji od mel feature-a, pa nisu usvojeni kao novi default
+- `k-fold` tooling je dodat, ali puni k-fold retraining nije pokrenut jer bi znacajno produzio eksperiment bez garancije da ce biti bolji od finalnog submit-ready setupa
+- pravi test transkripti i dalje nisu dostupni u `test_set_catB.zip`, pa inferenca nad tim folderom radi sa praznim tekstom; kad ti transkripti postoje, novi text-aware model ih moze direktno koristiti

@@ -22,6 +22,7 @@ artifacts/predictions/synth_test_refined/
 artifacts/predictions/final_test_submission/
 artifacts/predictions/final_test_avatar_ready/
 artifacts/checkpoints/*/last.pt
+artifacts/checkpoints/smoke_*/
 artifacts/checkpoints/improved_cpu_eval/
 artifacts/checkpoints/improved_smoke/
 reports/figures/compat_eval/

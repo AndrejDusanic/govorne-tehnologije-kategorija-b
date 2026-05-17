@@ -16,6 +16,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from blendshape_project.constants import BLENDSHAPE_NAMES, SPEAKER_ORDER, blendshape_priority_weights  # noqa: E402
+from blendshape_project.aux_labels import available_aux_target_types, available_viseme_variants, build_aux_vocab  # noqa: E402
 from blendshape_project.data import (  # noqa: E402
     AudioFeatureExtractor,
     BlendshapeDataset,
@@ -49,6 +50,8 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, default=ROOT / "data" / "manifests" / "natural_samples.csv")
     parser.add_argument("--split-json", type=Path, default=ROOT / "data" / "manifests" / "split.json")
     parser.add_argument("--phoneme-vocab", type=Path, default=ROOT / "data" / "manifests" / "phoneme_vocab.json")
+    parser.add_argument("--aux-target-type", type=str, default="phoneme", choices=available_aux_target_types())
+    parser.add_argument("--viseme-variant", type=str, default="viseme_balanced_10", choices=available_viseme_variants())
     parser.add_argument("--run-name", type=str, default="baseline_causal")
     parser.add_argument("--init-checkpoint", type=Path, default=None)
     parser.add_argument("--epochs", type=int, default=25)
@@ -63,8 +66,11 @@ def main() -> None:
     parser.add_argument("--peak-loss-weight", type=float, default=0.35)
     parser.add_argument("--activity-gamma", type=float, default=1.5)
     parser.add_argument("--temporal-encoder", type=str, default="bgru", choices=["causal_tcn", "bgru"])
+    parser.add_argument("--use-speaker-embedding", action="store_true", default=True)
+    parser.add_argument("--no-speaker-embedding", dest="use_speaker_embedding", action="store_false")
     parser.add_argument("--use-text-conditioning", action="store_true", default=True)
     parser.add_argument("--no-text-conditioning", dest="use_text_conditioning", action="store_false")
+    parser.add_argument("--speaker-embed-dim", type=int, default=16)
     parser.add_argument("--char-embed-dim", type=int, default=64)
     parser.add_argument("--text-hidden-size", type=int, default=128)
     parser.add_argument("--num-attention-heads", type=int, default=4)
@@ -82,7 +88,15 @@ def main() -> None:
 
     frame = pd.read_csv(args.manifest)
     split = load_json(args.split_json)
-    phoneme_vocab = load_json(args.phoneme_vocab)
+    if args.aux_target_type == "phoneme":
+        phoneme_vocab = load_json(args.phoneme_vocab)
+    else:
+        phoneme_paths = [path for path in frame["phoneme_path"].fillna("").astype(str).tolist() if path.strip()]
+        phoneme_vocab = build_aux_vocab(
+            phoneme_paths,
+            aux_target_type=args.aux_target_type,
+            viseme_variant=args.viseme_variant,
+        )
     speaker_to_id = {speaker: idx for idx, speaker in enumerate(SPEAKER_ORDER)}
 
     train_df = frame[frame["sample_id"].isin(split["train"])].copy()
@@ -96,6 +110,7 @@ def main() -> None:
     save_json(run_dir / "stats.json", stats.to_json())
     char_vocab = build_char_vocab(frame["text"].fillna("").astype(str).tolist())
     save_json(run_dir / "char_vocab.json", char_vocab)
+    save_json(run_dir / "aux_vocab.json", phoneme_vocab)
 
     train_dataset = BlendshapeDataset(
         train_df,
@@ -104,6 +119,8 @@ def main() -> None:
         phoneme_vocab=phoneme_vocab,
         char_vocab=char_vocab,
         speaker_to_id=speaker_to_id,
+        aux_target_type=args.aux_target_type,
+        viseme_variant=args.viseme_variant,
     )
     val_dataset = BlendshapeDataset(
         val_df,
@@ -112,6 +129,8 @@ def main() -> None:
         phoneme_vocab=phoneme_vocab,
         char_vocab=char_vocab,
         speaker_to_id=speaker_to_id,
+        aux_target_type=args.aux_target_type,
+        viseme_variant=args.viseme_variant,
     )
 
     train_loader = DataLoader(
@@ -139,6 +158,8 @@ def main() -> None:
         num_chars=len(char_vocab),
         hidden_size=args.hidden_size,
         dropout=args.dropout,
+        use_speaker_embedding=args.use_speaker_embedding,
+        speaker_embed_dim=args.speaker_embed_dim,
         char_embed_dim=args.char_embed_dim,
         text_hidden_size=args.text_hidden_size,
         use_text_conditioning=args.use_text_conditioning,
@@ -174,7 +195,7 @@ def main() -> None:
             targets = batch["targets"].to(device)
             target_mask = batch["target_mask"].to(device)
             target_activity = batch["target_activity"].to(device)
-            phoneme_ids = batch["phoneme_ids"].to(device)
+            aux_ids = batch["aux_ids"].to(device)
 
             optimizer.zero_grad(set_to_none=True)
             outputs = model(
@@ -190,7 +211,7 @@ def main() -> None:
                     "targets": targets,
                     "target_mask": target_mask,
                     "target_activity": target_activity,
-                    "phoneme_ids": phoneme_ids,
+                    "aux_ids": aux_ids,
                 },
                 phoneme_loss_weight=args.phoneme_loss_weight,
                 temporal_loss_weight=args.temporal_loss_weight,
@@ -225,6 +246,9 @@ def main() -> None:
             "config": checkpoint_config,
             "stats": stats.to_json(),
             "speaker_to_id": speaker_to_id,
+            "aux_vocab": phoneme_vocab,
+            "aux_target_type": args.aux_target_type,
+            "viseme_variant": args.viseme_variant,
             "phoneme_vocab": phoneme_vocab,
             "char_vocab": char_vocab,
             "blendshape_names": BLENDSHAPE_NAMES,

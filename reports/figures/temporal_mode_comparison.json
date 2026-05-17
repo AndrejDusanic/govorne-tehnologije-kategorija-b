@@ -1,0 +1,124 @@
+{
+  "causal": {
+    "checkpoint": "artifacts\\checkpoints\\baseline_full_v1\\best.pt",
+    "temporal_encoder": "causal_tcn",
+    "use_speaker_embedding": true,
+    "aux_target_type": "phoneme",
+    "viseme_variant": null,
+    "refiner": "artifacts\\refiners\\solo_modes\\baseline_full_v1_solo_refiner.npz",
+    "refiner_meta": {
+      "checkpoint": "artifacts\\checkpoints\\baseline_full_v1\\best.pt",
+      "best_strength": 0.2,
+      "best_metrics": {
+        "mae": 0.018789011985063553,
+        "rmse": 0.04471239820122719,
+        "mouth_mae": 0.022889519110322,
+        "jaw_open_mae": 0.02581099607050419
+      },
+      "strength_grid": [
+        {
+          "strength": 0.15,
+          "mae": 0.018789829686284065,
+          "rmse": 0.044804949313402176,
+          "mouth_mae": 0.022900542244315147,
+          "jaw_open_mae": 0.02581959217786789
+        },
+        {
+          "strength": 0.2,
+          "mae": 0.018789011985063553,
+          "rmse": 0.04471239820122719,
+          "mouth_mae": 0.022889519110322,
+          "jaw_open_mae": 0.02581099607050419
+        },
+        {
+          "strength": 0.25,
+          "mae": 0.01879367046058178,
+          "rmse": 0.044624894857406616,
+          "mouth_mae": 0.0228824894875288,
+          "jaw_open_mae": 0.025803927332162857
+        },
+        {
+          "strength": 0.3,
+          "mae": 0.018803581595420837,
+          "rmse": 0.04454250633716583,
+          "mouth_mae": 0.02287926711142063,
+          "jaw_open_mae": 0.02579856663942337
+        },
+        {
+          "strength": 0.35,
+          "mae": 0.018818587064743042,
+          "rmse": 0.044465288519859314,
+          "mouth_mae": 0.022879840806126595,
+          "jaw_open_mae": 0.025794845074415207
+        }
+      ]
+    },
+    "metrics": {
+      "mae": 0.018785814797953646,
+      "rmse": 0.04471243937885884,
+      "mouth_mae": 0.022887757252992254,
+      "jaw_open_mae": 0.025810995173195815
+    }
+  },
+  "offline": {
+    "checkpoint": "artifacts\\checkpoints\\text_bgru_v1_cpu\\best.pt",
+    "temporal_encoder": "bgru",
+    "use_speaker_embedding": true,
+    "aux_target_type": "phoneme",
+    "viseme_variant": null,
+    "refiner": "artifacts\\refiners\\solo_modes\\text_bgru_v1_cpu_solo_refiner.npz",
+    "refiner_meta": {
+      "checkpoint": "artifacts\\checkpoints\\text_bgru_v1_cpu\\best.pt",
+      "best_strength": 0.35,
+      "best_metrics": {
+        "mae": 0.019291773438453674,
+        "rmse": 0.043048202991485596,
+        "mouth_mae": 0.02263086475431919,
+        "jaw_open_mae": 0.024629056453704834
+      },
+      "strength_grid": [
+        {
+          "strength": 0.15,
+          "mae": 0.01931646279990673,
+          "rmse": 0.04322086647152901,
+          "mouth_mae": 0.0227485541254282,
+          "jaw_open_mae": 0.024817073717713356
+        },
+        {
+          "strength": 0.2,
+          "mae": 0.019306709989905357,
+          "rmse": 0.04317319393157959,
+          "mouth_mae": 0.022715821862220764,
+          "jaw_open_mae": 0.02476797066628933
+        },
+        {
+          "strength": 0.25,
+          "mae": 0.019299309700727463,
+          "rmse": 0.04312850162386894,
+          "mouth_mae": 0.022685198113322258,
+          "jaw_open_mae": 0.02472030557692051
+        },
+        {
+          "strength": 0.3,
+          "mae": 0.01929432898759842,
+          "rmse": 0.04308683052659035,
+          "mouth_mae": 0.02265685796737671,
+          "jaw_open_mae": 0.02467408962547779
+        },
+        {
+          "strength": 0.35,
+          "mae": 0.019291773438453674,
+          "rmse": 0.043048202991485596,
+          "mouth_mae": 0.02263086475431919,
+          "jaw_open_mae": 0.024629056453704834
+        }
+      ]
+    },
+    "metrics": {
+      "mae": 0.01928905021840004,
+      "rmse": 0.04304848116838432,
+      "mouth_mae": 0.022630016111181494,
+      "jaw_open_mae": 0.02462905678620101
+    }
+  }
+}

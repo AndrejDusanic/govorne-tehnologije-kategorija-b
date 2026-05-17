@@ -35,6 +35,7 @@ def load_model_bundle(
     stats = DatasetStats.from_json(checkpoint["stats"])
     speaker_to_id = checkpoint.get("speaker_to_id", {speaker: idx for idx, speaker in enumerate(SPEAKER_ORDER)})
     phoneme_vocab = checkpoint.get("phoneme_vocab", {"<pad>": 0, "<unk>": 1})
+    phoneme_vocab = checkpoint.get("aux_vocab", phoneme_vocab)
     char_vocab = checkpoint.get("char_vocab", {"<pad>": 0, "<unk>": 1})
     config = checkpoint.get("config", {})
 
@@ -46,6 +47,7 @@ def load_model_bundle(
         num_chars=len(char_vocab),
         hidden_size=config.get("hidden_size", 256),
         dropout=config.get("dropout", 0.12),
+        use_speaker_embedding=config.get("use_speaker_embedding", True),
         char_embed_dim=config.get("char_embed_dim", 64),
         text_hidden_size=config.get("text_hidden_size", 128),
         use_text_conditioning=config.get("use_text_conditioning", False),

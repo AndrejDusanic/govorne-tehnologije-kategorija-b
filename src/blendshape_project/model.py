@@ -60,6 +60,7 @@ class BlendshapeRegressor(nn.Module):
         num_chars: int = 0,
         hidden_size: int = 256,
         dropout: float = 0.1,
+        use_speaker_embedding: bool = True,
         speaker_embed_dim: int = 16,
         char_embed_dim: int = 64,
         text_hidden_size: int | None = None,
@@ -72,9 +73,15 @@ class BlendshapeRegressor(nn.Module):
         self.hidden_size = hidden_size
         self.temporal_encoder = temporal_encoder
         self.use_text_conditioning = use_text_conditioning and num_chars > 0
-        self.speaker_embedding = nn.Embedding(num_speakers, speaker_embed_dim)
+        self.use_speaker_embedding = use_speaker_embedding and num_speakers > 0 and speaker_embed_dim > 0
+        if self.use_speaker_embedding:
+            self.speaker_embedding = nn.Embedding(num_speakers, speaker_embed_dim)
+            input_channels = input_dim + speaker_embed_dim
+        else:
+            self.speaker_embedding = None
+            input_channels = input_dim
         self.input_proj = nn.Sequential(
-            nn.Conv1d(input_dim + speaker_embed_dim, hidden_size, kernel_size=1),
+            nn.Conv1d(input_channels, hidden_size, kernel_size=1),
             nn.GELU(),
             nn.Dropout(dropout),
         )
@@ -162,14 +169,18 @@ class BlendshapeRegressor(nn.Module):
     def forward(
         self,
         features: torch.Tensor,
-        speaker_ids: torch.Tensor,
+        speaker_ids: torch.Tensor | None,
         lengths: torch.Tensor | None = None,
         text_ids: torch.Tensor | None = None,
         text_lengths: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         tensor = features.transpose(1, 2)
-        speaker_embedding = self.speaker_embedding(speaker_ids).unsqueeze(-1).expand(-1, -1, tensor.shape[-1])
-        tensor = self.input_proj(torch.cat([tensor, speaker_embedding], dim=1))
+        if self.use_speaker_embedding:
+            if speaker_ids is None:
+                raise ValueError("speaker_ids are required when use_speaker_embedding=True")
+            speaker_embedding = self.speaker_embedding(speaker_ids).unsqueeze(-1).expand(-1, -1, tensor.shape[-1])
+            tensor = torch.cat([tensor, speaker_embedding], dim=1)
+        tensor = self.input_proj(tensor)
         sequence = tensor.transpose(1, 2)
         sequence = self._apply_text_conditioning(sequence, text_ids=text_ids, text_lengths=text_lengths)
 
@@ -180,6 +191,7 @@ class BlendshapeRegressor(nn.Module):
             tensor = self.final_norm(tensor)
             return {
                 "blendshapes": self.regression_head(tensor).transpose(1, 2),
+                "aux_logits": self.phoneme_head(tensor).transpose(1, 2),
                 "phonemes": self.phoneme_head(tensor).transpose(1, 2),
             }
 
@@ -196,5 +208,6 @@ class BlendshapeRegressor(nn.Module):
         sequence_output = sequence_output + self.sequence_ffn(sequence_output)
         return {
             "blendshapes": self.sequence_regression_head(sequence_output),
+            "aux_logits": self.sequence_phoneme_head(sequence_output),
             "phonemes": self.sequence_phoneme_head(sequence_output),
         }

@@ -28,6 +28,7 @@ from .constants import (
     TEXT_PAD,
     TEXT_UNK,
 )
+from .aux_labels import project_aux_label
 from .io_utils import framewise_phoneme_labels, read_alignment, read_blendshape_csv
 
 
@@ -219,6 +220,8 @@ class BlendshapeDataset(Dataset):
         phoneme_vocab: dict[str, int] | None = None,
         char_vocab: dict[str, int] | None = None,
         speaker_to_id: dict[str, int] | None = None,
+        aux_target_type: str = "phoneme",
+        viseme_variant: str = "viseme_balanced_10",
     ) -> None:
         self.frame = frame.reset_index(drop=True)
         self.feature_extractor = feature_extractor
@@ -226,6 +229,8 @@ class BlendshapeDataset(Dataset):
         self.phoneme_vocab = phoneme_vocab or {PHONEME_PAD: 0, PHONEME_UNK: 1}
         self.char_vocab = char_vocab or {TEXT_PAD: 0, TEXT_UNK: 1}
         self.speaker_to_id = speaker_to_id or {speaker: idx for idx, speaker in enumerate(SPEAKER_ORDER)}
+        self.aux_target_type = aux_target_type
+        self.viseme_variant = viseme_variant
         self.feature_mean = None
         self.feature_std = None
         self.target_mean = None
@@ -270,6 +275,14 @@ class BlendshapeDataset(Dataset):
                 n_frames=target_frames,
                 fps=int(record.get("fps", DEFAULT_FPS)),
             )
+            labels = [
+                project_aux_label(
+                    label,
+                    aux_target_type=self.aux_target_type,
+                    viseme_variant=self.viseme_variant,
+                )
+                for label in labels
+            ]
             phoneme_ids = torch.tensor(
                 [self.phoneme_vocab.get(label, self.phoneme_vocab.get(PHONEME_UNK, 1)) for label in labels],
                 dtype=torch.long,
@@ -285,6 +298,7 @@ class BlendshapeDataset(Dataset):
             "features": features,
             "targets": target_tensor,
             "target_activity": target_activity,
+            "aux_ids": phoneme_ids,
             "phoneme_ids": phoneme_ids,
             "length": features.shape[0],
             "duration_sec": float(record["duration_sec"]),
@@ -324,6 +338,7 @@ def collate_batch(batch: list[dict[str, Any]]) -> dict[str, Any]:
         "targets": targets,
         "target_activity": target_activity,
         "target_mask": target_mask,
+        "aux_ids": phoneme_ids,
         "phoneme_ids": phoneme_ids,
         "lengths": lengths,
         "durations_sec": torch.tensor([item["duration_sec"] for item in batch], dtype=torch.float32),
