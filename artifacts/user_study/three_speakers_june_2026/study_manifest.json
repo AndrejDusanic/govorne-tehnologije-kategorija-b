@@ -1,0 +1,213 @@
+{
+  "study_name": "three_speakers_mobile_rating_june_2026",
+  "description": "Seen vs unseen vs TTS avatar quality study",
+  "model_recommendation": {
+    "checkpoint": "artifacts/checkpoints/expanded_bgru_no_speaker_v1/best.pt",
+    "face_refiner": "artifacts/refiners/expanded_bgru_no_speaker_v1_face_refiner.npz",
+    "random_blinks": true,
+    "blink_strength": 1.0
+  },
+  "assumptions": [
+    "Nikola FC files were matched exactly to spk03 source recordings.",
+    "Marko (Stefan folder) and Cope files are assumed to follow the same five prompts in the same order as the Nikola set."
+  ],
+  "survey_order": [
+    "marko_01",
+    "nikola_03",
+    "cope_02",
+    "nikola_01",
+    "marko_04",
+    "cope_05",
+    "nikola_05",
+    "cope_01",
+    "marko_02",
+    "nikola_02",
+    "cope_04",
+    "marko_05",
+    "nikola_04",
+    "cope_03",
+    "marko_03"
+  ],
+  "items": [
+    {
+      "key": "nikola_01",
+      "label": "Nikola1",
+      "condition": "seen",
+      "speaker_name": "Nikola",
+      "source_audio": "C:\\Users\\Administrator\\Downloads\\Nikola\\FC_029.wav",
+      "prompt_number": "29",
+      "text": "Eto, svemu jednom ipak dođe kraj.",
+      "text_origin": "spk03 transcript (exact match to FC file)",
+      "audio_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\audio_inputs\\nikola_01.wav",
+      "text_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\text_inputs\\nikola_01.txt"
+    },
+    {
+      "key": "nikola_02",
+      "label": "Nikola2",
+      "condition": "seen",
+      "speaker_name": "Nikola",
+      "source_audio": "C:\\Users\\Administrator\\Downloads\\Nikola\\FC_046.wav",
+      "prompt_number": "46",
+      "text": "Ne traži više nego što možeš da daš.",
+      "text_origin": "spk03 transcript (exact match to FC file)",
+      "audio_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\audio_inputs\\nikola_02.wav",
+      "text_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\text_inputs\\nikola_02.txt"
+    },
+    {
+      "key": "nikola_03",
+      "label": "Nikola3",
+      "condition": "seen",
+      "speaker_name": "Nikola",
+      "source_audio": "C:\\Users\\Administrator\\Downloads\\Nikola\\FC_114.wav",
+      "prompt_number": "114",
+      "text": "Nije najgore što sve prolazi.",
+      "text_origin": "spk03 transcript (exact match to FC file)",
+      "audio_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\audio_inputs\\nikola_03.wav",
+      "text_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\text_inputs\\nikola_03.txt"
+    },
+    {
+      "key": "nikola_04",
+      "label": "Nikola4",
+      "condition": "seen",
+      "speaker_name": "Nikola",
+      "source_audio": "C:\\Users\\Administrator\\Downloads\\Nikola\\FC_143.wav",
+      "prompt_number": "143",
+      "text": "A onda je jedan student uzeo čašu i natočio vode u nju.",
+      "text_origin": "spk03 transcript (exact match to FC file)",
+      "audio_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\audio_inputs\\nikola_04.wav",
+      "text_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\text_inputs\\nikola_04.txt"
+    },
+    {
+      "key": "nikola_05",
+      "label": "Nikola5",
+      "condition": "seen",
+      "speaker_name": "Nikola",
+      "source_audio": "C:\\Users\\Administrator\\Downloads\\Nikola\\FC_147.wav",
+      "prompt_number": "147",
+      "text": "Nikad ne uzimaj ono što ne možeš da sačuvaš.",
+      "text_origin": "spk03 transcript (exact match to FC file)",
+      "audio_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\audio_inputs\\nikola_05.wav",
+      "text_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\text_inputs\\nikola_05.txt"
+    },
+    {
+      "key": "marko_01",
+      "label": "Marko1",
+      "condition": "unseen",
+      "speaker_name": "Marko",
+      "source_audio": "C:\\Users\\Administrator\\Downloads\\Stefan\\stefan_0000.wav",
+      "prompt_number": "29",
+      "text": "Eto, svemu jednom ipak dođe kraj.",
+      "text_origin": "assumed same prompt order as Nikola set",
+      "audio_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\audio_inputs\\marko_01.wav",
+      "text_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\text_inputs\\marko_01.txt"
+    },
+    {
+      "key": "marko_02",
+      "label": "Marko2",
+      "condition": "unseen",
+      "speaker_name": "Marko",
+      "source_audio": "C:\\Users\\Administrator\\Downloads\\Stefan\\stefan_0001.wav",
+      "prompt_number": "46",
+      "text": "Ne traži više nego što možeš da daš.",
+      "text_origin": "assumed same prompt order as Nikola set",
+      "audio_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\audio_inputs\\marko_02.wav",
+      "text_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\text_inputs\\marko_02.txt"
+    },
+    {
+      "key": "marko_03",
+      "label": "Marko3",
+      "condition": "unseen",
+      "speaker_name": "Marko",
+      "source_audio": "C:\\Users\\Administrator\\Downloads\\Stefan\\stefan_0002.wav",
+      "prompt_number": "114",
+      "text": "Nije najgore što sve prolazi.",
+      "text_origin": "assumed same prompt order as Nikola set",
+      "audio_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\audio_inputs\\marko_03.wav",
+      "text_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\text_inputs\\marko_03.txt"
+    },
+    {
+      "key": "marko_04",
+      "label": "Marko4",
+      "condition": "unseen",
+      "speaker_name": "Marko",
+      "source_audio": "C:\\Users\\Administrator\\Downloads\\Stefan\\stefan_0003.wav",
+      "prompt_number": "143",
+      "text": "A onda je jedan student uzeo čašu i natočio vode u nju.",
+      "text_origin": "assumed same prompt order as Nikola set",
+      "audio_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\audio_inputs\\marko_04.wav",
+      "text_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\text_inputs\\marko_04.txt"
+    },
+    {
+      "key": "marko_05",
+      "label": "Marko5",
+      "condition": "unseen",
+      "speaker_name": "Marko",
+      "source_audio": "C:\\Users\\Administrator\\Downloads\\Stefan\\stefan_0004.wav",
+      "prompt_number": "147",
+      "text": "Nikad ne uzimaj ono što ne možeš da sačuvaš.",
+      "text_origin": "assumed same prompt order as Nikola set",
+      "audio_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\audio_inputs\\marko_05.wav",
+      "text_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\text_inputs\\marko_05.txt"
+    },
+    {
+      "key": "cope_01",
+      "label": "Cope1",
+      "condition": "tts",
+      "speaker_name": "Cope",
+      "source_audio": "C:\\Users\\Administrator\\Downloads\\COPE\\Cope1.wav",
+      "prompt_number": "29",
+      "text": "Eto, svemu jednom ipak dođe kraj.",
+      "text_origin": "assumed same prompt order as Nikola set",
+      "audio_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\audio_inputs\\cope_01.wav",
+      "text_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\text_inputs\\cope_01.txt"
+    },
+    {
+      "key": "cope_02",
+      "label": "Cope2",
+      "condition": "tts",
+      "speaker_name": "Cope",
+      "source_audio": "C:\\Users\\Administrator\\Downloads\\COPE\\Cope2.wav",
+      "prompt_number": "46",
+      "text": "Ne traži više nego što možeš da daš.",
+      "text_origin": "assumed same prompt order as Nikola set",
+      "audio_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\audio_inputs\\cope_02.wav",
+      "text_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\text_inputs\\cope_02.txt"
+    },
+    {
+      "key": "cope_03",
+      "label": "Cope3",
+      "condition": "tts",
+      "speaker_name": "Cope",
+      "source_audio": "C:\\Users\\Administrator\\Downloads\\COPE\\Cope3.wav",
+      "prompt_number": "114",
+      "text": "Nije najgore što sve prolazi.",
+      "text_origin": "assumed same prompt order as Nikola set",
+      "audio_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\audio_inputs\\cope_03.wav",
+      "text_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\text_inputs\\cope_03.txt"
+    },
+    {
+      "key": "cope_04",
+      "label": "Cope4",
+      "condition": "tts",
+      "speaker_name": "Cope",
+      "source_audio": "C:\\Users\\Administrator\\Downloads\\COPE\\Cope4.wav",
+      "prompt_number": "143",
+      "text": "A onda je jedan student uzeo čašu i natočio vode u nju.",
+      "text_origin": "assumed same prompt order as Nikola set",
+      "audio_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\audio_inputs\\cope_04.wav",
+      "text_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\text_inputs\\cope_04.txt"
+    },
+    {
+      "key": "cope_05",
+      "label": "Cope5",
+      "condition": "tts",
+      "speaker_name": "Cope",
+      "source_audio": "C:\\Users\\Administrator\\Downloads\\COPE\\Cope5.wav",
+      "prompt_number": "147",
+      "text": "Nikad ne uzimaj ono što ne možeš da sačuvaš.",
+      "text_origin": "assumed same prompt order as Nikola set",
+      "audio_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\audio_inputs\\cope_05.wav",
+      "text_path": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\user_study\\three_speakers_june_2026\\text_inputs\\cope_05.txt"
+    }
+  ]
+}

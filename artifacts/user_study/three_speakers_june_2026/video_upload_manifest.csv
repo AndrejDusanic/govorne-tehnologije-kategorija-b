@@ -1,0 +1,16 @@
+survey_position,key,label,condition,expected_mp4_name,drive_file_id,text
+1,marko_01,Marko1,unseen,Marko1.mp4,,"Eto, svemu jednom ipak dođe kraj."
+2,nikola_03,Nikola3,seen,Nikola3.mp4,,Nije najgore što sve prolazi.
+3,cope_02,Cope2,tts,Cope2.mp4,,Ne traži više nego što možeš da daš.
+4,nikola_01,Nikola1,seen,Nikola1.mp4,,"Eto, svemu jednom ipak dođe kraj."
+5,marko_04,Marko4,unseen,Marko4.mp4,,A onda je jedan student uzeo čašu i natočio vode u nju.
+6,cope_05,Cope5,tts,Cope5.mp4,,Nikad ne uzimaj ono što ne možeš da sačuvaš.
+7,nikola_05,Nikola5,seen,Nikola5.mp4,,Nikad ne uzimaj ono što ne možeš da sačuvaš.
+8,cope_01,Cope1,tts,Cope1.mp4,,"Eto, svemu jednom ipak dođe kraj."
+9,marko_02,Marko2,unseen,Marko2.mp4,,Ne traži više nego što možeš da daš.
+10,nikola_02,Nikola2,seen,Nikola2.mp4,,Ne traži više nego što možeš da daš.
+11,cope_04,Cope4,tts,Cope4.mp4,,A onda je jedan student uzeo čašu i natočio vode u nju.
+12,marko_05,Marko5,unseen,Marko5.mp4,,Nikad ne uzimaj ono što ne možeš da sačuvaš.
+13,nikola_04,Nikola4,seen,Nikola4.mp4,,A onda je jedan student uzeo čašu i natočio vode u nju.
+14,cope_03,Cope3,tts,Cope3.mp4,,Nije najgore što sve prolazi.
+15,marko_03,Marko3,unseen,Marko3.mp4,,Nije najgore što sve prolazi.

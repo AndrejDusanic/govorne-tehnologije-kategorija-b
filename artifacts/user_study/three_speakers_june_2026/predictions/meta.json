@@ -1,0 +1,233 @@
+{
+  "system": {
+    "lookahead_ms": 6805,
+    "fps_out": 60,
+    "ensemble_size": 1,
+    "ensemble_weights": [
+      1.0
+    ],
+    "checkpoints": [
+      "expanded_bgru_no_speaker_v1/best.pt"
+    ],
+    "face_refiner": "C:\\Users\\Administrator\\Documents\\govorne tehnologije\\artifacts\\refiners\\expanded_bgru_no_speaker_v1_face_refiner.npz",
+    "face_refiner_strength": 0.5,
+    "random_blinks": true,
+    "blink_strength": 1.0,
+    "blink_seed": 1337,
+    "warmup_runs": 1
+  },
+  "files": {
+    "cope_01.wav": {
+      "csv_path": "cope_01.csv",
+      "text_used": "Eto, svemu jednom ipak dođe kraj.",
+      "inference_time_sec": 0.2791508000000249,
+      "rtf": 0.06121728070175985,
+      "blink_postprocess": {
+        "count": 1,
+        "centers_sec": [
+          1.354
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    },
+    "cope_02.wav": {
+      "csv_path": "cope_02.csv",
+      "text_used": "Ne traži više nego što možeš da daš.",
+      "inference_time_sec": 0.1544858000002023,
+      "rtf": 0.05336150775817065,
+      "blink_postprocess": {
+        "count": 1,
+        "centers_sec": [
+          1.633
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    },
+    "cope_03.wav": {
+      "csv_path": "cope_03.csv",
+      "text_used": "Nije najgore što sve prolazi.",
+      "inference_time_sec": 0.1683379999999488,
+      "rtf": 0.04355356878848778,
+      "blink_postprocess": {
+        "count": 1,
+        "centers_sec": [
+          1.43
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    },
+    "cope_04.wav": {
+      "csv_path": "cope_04.csv",
+      "text_used": "A onda je jedan student uzeo čašu i natočio vode u nju.",
+      "inference_time_sec": 0.18441800000027797,
+      "rtf": 0.05529643520069256,
+      "blink_postprocess": {
+        "count": 1,
+        "centers_sec": [
+          1.823
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    },
+    "cope_05.wav": {
+      "csv_path": "cope_05.csv",
+      "text_used": "Nikad ne uzimaj ono što ne možeš da sačuvaš.",
+      "inference_time_sec": 0.16208580000011352,
+      "rtf": 0.04521121668293258,
+      "blink_postprocess": {
+        "count": 1,
+        "centers_sec": [
+          2.171
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    },
+    "marko_01.wav": {
+      "csv_path": "marko_01.csv",
+      "text_used": "Eto, svemu jednom ipak dođe kraj.",
+      "inference_time_sec": 0.1862991999996666,
+      "rtf": 0.04560580589285086,
+      "blink_postprocess": {
+        "count": 1,
+        "centers_sec": [
+          1.488
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    },
+    "marko_02.wav": {
+      "csv_path": "marko_02.csv",
+      "text_used": "Ne traži više nego što možeš da daš.",
+      "inference_time_sec": 0.11162610000019413,
+      "rtf": 0.05526044554465056,
+      "blink_postprocess": {
+        "count": 1,
+        "centers_sec": [
+          1.28
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    },
+    "marko_03.wav": {
+      "csv_path": "marko_03.csv",
+      "text_used": "Nije najgore što sve prolazi.",
+      "inference_time_sec": 0.16174239999963902,
+      "rtf": 0.054275973154241285,
+      "blink_postprocess": {
+        "count": 1,
+        "centers_sec": [
+          1.885
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    },
+    "marko_04.wav": {
+      "csv_path": "marko_04.csv",
+      "text_used": "A onda je jedan student uzeo čašu i natočio vode u nju.",
+      "inference_time_sec": 0.13433749999967404,
+      "rtf": 0.05362798723622363,
+      "blink_postprocess": {
+        "count": 1,
+        "centers_sec": [
+          1.675
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    },
+    "marko_05.wav": {
+      "csv_path": "marko_05.csv",
+      "text_used": "Nikad ne uzimaj ono što ne možeš da sačuvaš.",
+      "inference_time_sec": 0.12434999999959473,
+      "rtf": 0.04764409209367618,
+      "blink_postprocess": {
+        "count": 1,
+        "centers_sec": [
+          1.018
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    },
+    "nikola_01.wav": {
+      "csv_path": "nikola_01.csv",
+      "text_used": "Eto, svemu jednom ipak dođe kraj.",
+      "inference_time_sec": 0.22878429999991567,
+      "rtf": 0.04001835494348415,
+      "blink_postprocess": {
+        "count": 1,
+        "centers_sec": [
+          1.96
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    },
+    "nikola_02.wav": {
+      "csv_path": "nikola_02.csv",
+      "text_used": "Ne traži više nego što možeš da daš.",
+      "inference_time_sec": 0.239187099999981,
+      "rtf": 0.04833058927834668,
+      "blink_postprocess": {
+        "count": 2,
+        "centers_sec": [
+          1.342,
+          3.878
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    },
+    "nikola_03.wav": {
+      "csv_path": "nikola_03.csv",
+      "text_used": "Nije najgore što sve prolazi.",
+      "inference_time_sec": 0.162525000000187,
+      "rtf": 0.04140776292381072,
+      "blink_postprocess": {
+        "count": 1,
+        "centers_sec": [
+          1.298
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    },
+    "nikola_04.wav": {
+      "csv_path": "nikola_04.csv",
+      "text_used": "A onda je jedan student uzeo čašu i natočio vode u nju.",
+      "inference_time_sec": 0.2909160000003794,
+      "rtf": 0.04275040186610041,
+      "blink_postprocess": {
+        "count": 2,
+        "centers_sec": [
+          1.621,
+          5.709
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    },
+    "nikola_05.wav": {
+      "csv_path": "nikola_05.csv",
+      "text_used": "Nikad ne uzimaj ono što ne možeš da sačuvaš.",
+      "inference_time_sec": 0.23532580000028247,
+      "rtf": 0.04242912830707526,
+      "blink_postprocess": {
+        "count": 1,
+        "centers_sec": [
+          1.061
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    }
+  }
+}
