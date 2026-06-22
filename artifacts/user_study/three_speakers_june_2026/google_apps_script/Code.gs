@@ -1,104 +1,34 @@
 const SHEET_ID = '';
+const DRIVE_FOLDER_ID = '';
+
 const VIDEO_ITEMS = [
-  {
-    "key": "marko_01",
-    "label": "Marko1",
-    "condition": "unseen",
-    "driveId": ""
-  },
-  {
-    "key": "nikola_03",
-    "label": "Nikola3",
-    "condition": "seen",
-    "driveId": ""
-  },
-  {
-    "key": "cope_02",
-    "label": "Cope2",
-    "condition": "tts",
-    "driveId": ""
-  },
-  {
-    "key": "nikola_01",
-    "label": "Nikola1",
-    "condition": "seen",
-    "driveId": ""
-  },
-  {
-    "key": "marko_04",
-    "label": "Marko4",
-    "condition": "unseen",
-    "driveId": ""
-  },
-  {
-    "key": "cope_05",
-    "label": "Cope5",
-    "condition": "tts",
-    "driveId": ""
-  },
-  {
-    "key": "nikola_05",
-    "label": "Nikola5",
-    "condition": "seen",
-    "driveId": ""
-  },
-  {
-    "key": "cope_01",
-    "label": "Cope1",
-    "condition": "tts",
-    "driveId": ""
-  },
-  {
-    "key": "marko_02",
-    "label": "Marko2",
-    "condition": "unseen",
-    "driveId": ""
-  },
-  {
-    "key": "nikola_02",
-    "label": "Nikola2",
-    "condition": "seen",
-    "driveId": ""
-  },
-  {
-    "key": "cope_04",
-    "label": "Cope4",
-    "condition": "tts",
-    "driveId": ""
-  },
-  {
-    "key": "marko_05",
-    "label": "Marko5",
-    "condition": "unseen",
-    "driveId": ""
-  },
-  {
-    "key": "nikola_04",
-    "label": "Nikola4",
-    "condition": "seen",
-    "driveId": ""
-  },
-  {
-    "key": "cope_03",
-    "label": "Cope3",
-    "condition": "tts",
-    "driveId": ""
-  },
-  {
-    "key": "marko_03",
-    "label": "Marko3",
-    "condition": "unseen",
-    "driveId": ""
-  }
+  { key: 'marko_01', label: 'Marko1', condition: 'unseen', fileName: 'Marko1.mp4' },
+  { key: 'nikola_03', label: 'Nikola3', condition: 'seen', fileName: 'Nikola3.mp4' },
+  { key: 'cope_02', label: 'Cope2', condition: 'tts', fileName: 'Cope2.mp4' },
+  { key: 'nikola_01', label: 'Nikola1', condition: 'seen', fileName: 'Nikola1.mp4' },
+  { key: 'marko_04', label: 'Marko4', condition: 'unseen', fileName: 'Marko4.mp4' },
+  { key: 'cope_05', label: 'Cope5', condition: 'tts', fileName: 'Cope5.mp4' },
+  { key: 'nikola_05', label: 'Nikola5', condition: 'seen', fileName: 'Nikola5.mp4' },
+  { key: 'cope_01', label: 'Cope1', condition: 'tts', fileName: 'Cope1.mp4' },
+  { key: 'marko_02', label: 'Marko2', condition: 'unseen', fileName: 'Marko2.mp4' },
+  { key: 'nikola_02', label: 'Nikola2', condition: 'seen', fileName: 'Nikola2.mp4' },
+  { key: 'cope_04', label: 'Cope4', condition: 'tts', fileName: 'Cope4.mp4' },
+  { key: 'marko_05', label: 'Marko5', condition: 'unseen', fileName: 'Marko5.mp4' },
+  { key: 'nikola_04', label: 'Nikola4', condition: 'seen', fileName: 'Nikola4.mp4' },
+  { key: 'cope_03', label: 'Cope3', condition: 'tts', fileName: 'Cope3.mp4' },
+  { key: 'marko_03', label: 'Marko3', condition: 'unseen', fileName: 'Marko3.mp4' }
 ];
 
 function doGet() {
-  return HtmlService.createHtmlOutput(buildHtml_())
+  assertConfig_();
+  const resolvedItems = resolveVideoItems_();
+  return HtmlService.createHtmlOutput(buildHtml_(resolvedItems))
     .setTitle('Avatar anketa')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function saveScore(data) {
+  assertConfig_();
   const ss = SpreadsheetApp.openById(SHEET_ID);
   const sheet = ss.getSheets()[0];
   if (sheet.getLastRow() === 0) {
@@ -114,7 +44,51 @@ function saveScore(data) {
   return { ok: true };
 }
 
-function buildHtml_() {
+function assertConfig_() {
+  if (!SHEET_ID) {
+    throw new Error('SHEET_ID nije popunjen.');
+  }
+  if (!DRIVE_FOLDER_ID) {
+    throw new Error('DRIVE_FOLDER_ID nije popunjen.');
+  }
+}
+
+function resolveVideoItems_() {
+  const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+  const files = folder.getFiles();
+  const fileIdByName = {};
+
+  while (files.hasNext()) {
+    const file = files.next();
+    fileIdByName[file.getName()] = file.getId();
+  }
+
+  const missing = [];
+  const resolved = VIDEO_ITEMS.map(item => {
+    const driveId = fileIdByName[item.fileName];
+    if (!driveId) {
+      missing.push(item.fileName);
+    }
+    return {
+      key: item.key,
+      label: item.label,
+      condition: item.condition,
+      fileName: item.fileName,
+      driveId: driveId || ''
+    };
+  });
+
+  if (missing.length > 0) {
+    throw new Error(
+      'U Drive folderu nedostaju ocekivani fajlovi: ' + missing.join(', ')
+    );
+  }
+
+  return resolved;
+}
+
+function buildHtml_(items) {
+  const itemsJson = JSON.stringify(items);
   return `<!DOCTYPE html>
 <html lang="sr">
 <head>
@@ -348,18 +322,18 @@ function buildHtml_() {
 </head>
 <body>
   <div class="wrap">
-    <div class="eyebrow">Istraživanje</div>
+    <div class="eyebrow">Istrazivanje</div>
     <h1>Procena kvaliteta animacije avatara</h1>
-    <p class="sub">Pogledajte svaki video i ocenite koliko prirodno deluje način na koji avatar izgovara tekst.</p>
+    <p class="sub">Pogledajte svaki video i ocenite koliko prirodno deluje nacin na koji avatar izgovara tekst.</p>
 
     <div class="card" id="intro">
-      <div class="title">Dobrodošli</div>
-      <div class="muted">Anketa sadrži 15 kratkih video snimaka. Za svaki video dodeljuje se ocena od 1 do 5, gde je 1 potpuno nerealistično, a 5 potpuno realistično.</div>
+      <div class="title">Dobrodosli</div>
+      <div class="muted">Anketa sadrzi 15 kratkih video snimaka. Za svaki video dodeljuje se ocena od 1 do 5, gde je 1 potpuno nerealisticno, a 5 potpuno realisticno.</div>
       <label for="participantName">Ime i prezime *</label>
-      <input id="participantName" type="text" placeholder="npr. Ana Petrović" autocomplete="name" />
-      <div class="errtxt" id="nameError">Molimo unesite ime i prezime pre početka.</div>
+      <input id="participantName" type="text" placeholder="npr. Ana Petrovic" autocomplete="name" />
+      <div class="errtxt" id="nameError">Molimo unesite ime i prezime pre pocetka.</div>
       <div class="infobox">Video se otvara u novom tabu preko Google Drive linka. Nakon gledanja vratite se u anketu i unesite ocenu.</div>
-      <button class="primary" onclick="startSurvey()">Započni anketu</button>
+      <button class="primary" onclick="startSurvey()">Zapocni anketu</button>
     </div>
 
     <div id="survey">
@@ -384,8 +358,8 @@ function buildHtml_() {
         </a>
         <div class="question">Koliko prirodno deluje animacija avatara u ovom snimku?</div>
         <div class="scaleLegend">
-          <span>1 – Potpuno nerealistično</span>
-          <span>5 – Potpuno realistično</span>
+          <span>1 - Potpuno nerealisticno</span>
+          <span>5 - Potpuno realisticno</span>
         </div>
         <div class="scoreRow">
           <button class="scoreBtn" onclick="pickScore(1)">1</button>
@@ -394,18 +368,18 @@ function buildHtml_() {
           <button class="scoreBtn" onclick="pickScore(4)">4</button>
           <button class="scoreBtn" onclick="pickScore(5)">5</button>
         </div>
-        <button class="primary off" id="nextButton" onclick="submitAndNext()">Sledeći video</button>
+        <button class="primary off" id="nextButton" onclick="submitAndNext()">Sledeci video</button>
       </div>
     </div>
 
     <div class="card thanks" id="thanks">
       <h2>Hvala vam!</h2>
-      <p>Vaše ocene su uspešno zabeležene. Zahvaljujemo se na učešću.</p>
+      <p>Vase ocene su uspesno zabelezene. Zahvaljujemo se na ucescu.</p>
     </div>
   </div>
 
   <script>
-    const ITEMS = VIDEO_ITEMS;
+    const ITEMS = ${itemsJson};
     let participant = '';
     let currentIndex = 0;
     let selectedScore = null;
@@ -435,7 +409,7 @@ function buildHtml_() {
       const item = ITEMS[index];
       document.getElementById('videoTag').textContent = 'Video ' + String(index + 1).padStart(2, '0');
       document.getElementById('progressLabel').textContent = (index + 1) + ' / ' + ITEMS.length;
-      document.getElementById('progressFill').style.width = ((index / ITEMS.length) * 100) + '%';
+      document.getElementById('progressFill').style.width = (((index + 1) / ITEMS.length) * 100) + '%';
 
       const videoLink = document.getElementById('videoLink');
       videoLink.href = buildDriveUrl(item.driveId);
@@ -443,7 +417,7 @@ function buildHtml_() {
 
       document.querySelectorAll('.scoreBtn').forEach(btn => btn.classList.remove('on'));
       document.getElementById('nextButton').classList.add('off');
-      document.getElementById('nextButton').textContent = index === ITEMS.length - 1 ? 'Završi anketu' : 'Sledeći video';
+      document.getElementById('nextButton').textContent = index === ITEMS.length - 1 ? 'Zavrsi anketu' : 'Sledeci video';
       selectedScore = null;
     }
 
