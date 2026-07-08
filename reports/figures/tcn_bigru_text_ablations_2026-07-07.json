@@ -1,0 +1,85 @@
+{
+  "evaluation_scope": {
+    "dataset": "natural_samples.csv",
+    "split": "validation subset",
+    "subset_filter": [
+      "spk08",
+      "spk14"
+    ],
+    "n_samples": 54,
+    "note": "Ovo je isti legacy validation podskup nad kojim su dobijene originalne TCN/BiGRU metrike. Za organizatorski test_set_catB.zip nema ground-truth blendshape CSV-a, pa se MAE/RMSE ne mogu izracunati nad tim skupom."
+  },
+  "tcn_current_checkpoint": {
+    "checkpoint": "artifacts/checkpoints/baseline_full_v1/best.pt",
+    "uses_text_conditioning": false,
+    "audio_only_raw": {
+      "mae": 0.0189505429279581,
+      "rmse": 0.045143728098507654,
+      "mouth_mae": 0.02303440665794358,
+      "jaw_open_mae": 0.025855352120479274
+    },
+    "audio_only_refined": {
+      "mae": 0.018785814797953646,
+      "rmse": 0.04471243937885884,
+      "mouth_mae": 0.022887757252992254,
+      "jaw_open_mae": 0.025810995173195815
+    },
+    "audio_plus_text_no_viseme_raw": {
+      "mae": 0.0189505429279581,
+      "rmse": 0.045143728098507654,
+      "mouth_mae": 0.02303440665794358,
+      "jaw_open_mae": 0.025855352120479274
+    },
+    "audio_plus_text_no_viseme_refined": {
+      "mae": 0.018785814797953646,
+      "rmse": 0.04471243937885884,
+      "mouth_mae": 0.022887757252992254,
+      "jaw_open_mae": 0.025810995173195815
+    },
+    "note": "Za trenutni TCN checkpoint ne postoji tekstualna grana, pa su audio-only i audio+text/no-viseme numericki identicni."
+  },
+  "bigru_text_checkpoint": {
+    "checkpoint": "artifacts/checkpoints/text_bgru_v1_cpu/best.pt",
+    "uses_text_conditioning": true,
+    "audio_plus_text_no_viseme_raw": {
+      "mae": 0.01948734563357893,
+      "rmse": 0.04342289129900232,
+      "mouth_mae": 0.023047211908427668,
+      "jaw_open_mae": 0.024974664002139373
+    },
+    "audio_plus_text_no_viseme_refined": {
+      "mae": 0.01928905021840004,
+      "rmse": 0.04304848116838432,
+      "mouth_mae": 0.022630016111181494,
+      "jaw_open_mae": 0.02462905678620101
+    },
+    "audio_only_via_blank_text_raw": {
+      "mae": 0.01989073912916492,
+      "rmse": 0.04366951564872972,
+      "mouth_mae": 0.023314397189184356,
+      "jaw_open_mae": 0.025449934438358746
+    },
+    "audio_only_via_blank_text_refined": {
+      "mae": 0.019719286472946625,
+      "rmse": 0.04342809583560714,
+      "mouth_mae": 0.022901605383559395,
+      "jaw_open_mae": 0.025163025219131052
+    },
+    "note": "Audio-only brojke za BiGRU su dobijene tako sto je isti text-aware checkpoint evaluiran sa praznim tekstom pri inferenci. Ovo nije isto sto i posebno istreniran BiGRU bez tekstualnog conditioning-a."
+  },
+  "viseme_status": {
+    "available_checkpoint": "artifacts/checkpoints/smoke_viseme_balanced/best.pt",
+    "checkpoint_type": "smoke/proof-of-concept",
+    "training_regime": {
+      "epochs": 1,
+      "limit_train": 8
+    },
+    "raw_metrics": {
+      "mae": 0.03935521727209067,
+      "rmse": 0.07022783239785096,
+      "mouth_mae": 0.040969999254476676,
+      "jaw_open_mae": 0.04480823628865547
+    },
+    "note": "Ovaj viseme run nije dovoljno reprezentativan za slanje kao ozbiljan rezultat; za point (3) potreban je pun retraining."
+  }
+}
