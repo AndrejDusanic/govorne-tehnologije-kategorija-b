@@ -1,0 +1,5 @@
+Zdravo svima! Ja sam digitalni avatar, a pokreti mog lica nastaju na osnovu govora i teksta, uz pomoć modela mašinskog učenja.
+
+Iza svakog pokreta mojih usana i vilice nalazi se niz predviđenih numeričkih vrednosti.
+
+Kako smo to postigli? To će vam danas predstaviti Neda. Nedo, izvoli!
