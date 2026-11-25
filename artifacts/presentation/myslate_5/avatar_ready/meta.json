@@ -1,0 +1,40 @@
+{
+  "system": {
+    "lookahead_ms": 22551,
+    "fps_out": 60,
+    "ensemble_size": 1,
+    "ensemble_weights": [
+      1.0
+    ],
+    "checkpoints": [
+      "expanded_bgru_no_speaker_v1/best.pt"
+    ],
+    "face_refiner": "artifacts\\refiners\\expanded_bgru_no_speaker_v1_face_refiner.npz",
+    "face_refiner_strength": 0.5,
+    "random_blinks": true,
+    "blink_strength": 1.0,
+    "blink_seed": 1337,
+    "warmup_runs": 1
+  },
+  "files": {
+    "myslate_5.wav": {
+      "csv_path": "myslate_5.csv",
+      "text_used": "Zdravo svima, ja sam digitalni avatar. Pokreti mog lica nastaju na osnovu govora i teksta pomoću modela mašinskog učenja.\n\nIza svakog pokreta mojih usana i vilice stoji niz predviđenih numeričkih vrednosti.\n\nKako smo ovo postigli, objasniće vam Neda. Nedo, izvoli.",
+      "inference_time_sec": 0.49779799999998886,
+      "rtf": 0.02207461120619044,
+      "blink_postprocess": {
+        "count": 6,
+        "centers_sec": [
+          1.08,
+          5.462,
+          8.809,
+          13.309,
+          16.865,
+          21.102
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    }
+  }
+}
