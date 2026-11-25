@@ -1,0 +1,60 @@
+{
+  "system": {
+    "lookahead_ms": 28489,
+    "fps_out": 60,
+    "ensemble_size": 1,
+    "ensemble_weights": [
+      1.0
+    ],
+    "checkpoints": [
+      "expanded_bgru_no_speaker_v1/best.pt"
+    ],
+    "face_refiner": "artifacts\\refiners\\expanded_bgru_no_speaker_v1_face_refiner.npz",
+    "face_refiner_strength": 0.5,
+    "random_blinks": true,
+    "blink_strength": 1.0,
+    "blink_seed": 1337,
+    "warmup_runs": 1
+  },
+  "files": {
+    "avatar_muski.wav": {
+      "csv_path": "avatar_muski.csv",
+      "text_used": "Zdravo svima! Ja sam digitalni avatar, a pokreti mog lica nastaju na osnovu govora i teksta, uz pomoć modela mašinskog učenja.\n\nIza svakog pokreta mojih usana i vilice nalazi se niz predviđenih numeričkih vrednosti.\n\nKako smo to postigli? To će vam danas predstaviti Neda. Nedo, izvoli!\n",
+      "inference_time_sec": 0.6169112000000041,
+      "rtf": 0.0216551215175104,
+      "blink_postprocess": {
+        "count": 7,
+        "centers_sec": [
+          0.919,
+          5.546,
+          8.567,
+          11.907,
+          16.691,
+          21.427,
+          25.435
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    },
+    "avatar_zenski.wav": {
+      "csv_path": "avatar_zenski.csv",
+      "text_used": "Zdravo svima! Ja sam digitalni avatar, a pokreti mog lica nastaju na osnovu govora i teksta, uz pomoć modela mašinskog učenja.\n\nIza svakog pokreta mojih usana i vilice nalazi se niz predviđenih numeričkih vrednosti.\n\nKako smo to postigli? To će vam danas predstaviti Neda. Nedo, izvoli!\n",
+      "inference_time_sec": 0.5073357000001124,
+      "rtf": 0.020017969840861002,
+      "blink_postprocess": {
+        "count": 6,
+        "centers_sec": [
+          1.76,
+          5.621,
+          10.326,
+          14.527,
+          18.871,
+          23.55
+        ],
+        "seed": 1337,
+        "strength": 1.0
+      }
+    }
+  }
+}
